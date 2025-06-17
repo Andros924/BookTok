@@ -53,7 +53,7 @@ const authService = {
         await new Promise(resolve => setTimeout(resolve, 2000))
         
         // Verifica che il profilo sia stato creato dal trigger
-        const profile = await this.waitForProfile(authData.user.id, 5000)
+        const profile = await authService.waitForProfile(authData.user.id, 5000)
         
         toast.success('Registrazione completata con successo!')
         return { 
@@ -74,7 +74,7 @@ const authService = {
 
     } catch (error) {
       console.error('💥 Registration error:', error)
-      const message = this.getErrorMessage(error)
+      const message = authService.getErrorMessage(error)
       toast.error(message)
       throw new Error(message)
     }
@@ -86,7 +86,7 @@ const authService = {
     
     while (Date.now() - startTime < timeout) {
       try {
-        const profile = await this.getProfile(userId)
+        const profile = await authService.getProfile(userId)
         if (profile) {
           console.log('✅ Profile found after waiting:', profile.name)
           return profile
@@ -101,7 +101,7 @@ const authService = {
     }
     
     console.log('⚠️ Profile not found after timeout, creating fallback')
-    return this.createFallbackProfile(userId)
+    return authService.createFallbackProfile(userId)
   },
 
   // Crea profilo di fallback
@@ -146,13 +146,13 @@ const authService = {
       }
 
       // Ottieni il profilo utente con retry
-      const profile = await this.getOrCreateProfile(data.user)
+      const profile = await authService.getOrCreateProfile(data.user)
 
       toast.success('Login effettuato con successo!')
       return { user: data.user, profile }
     } catch (error) {
       console.error('❌ Login error:', error)
-      const message = this.getErrorMessage(error)
+      const message = authService.getErrorMessage(error)
       toast.error(message)
       throw new Error(message)
     }
@@ -190,7 +190,7 @@ const authService = {
 
       console.log('👤 User found:', user.id)
       
-      const profile = await this.getOrCreateProfile(user)
+      const profile = await authService.getOrCreateProfile(user)
       
       console.log('📋 Profile result:', profile ? 'Found' : 'Not found')
       
@@ -235,7 +235,7 @@ const authService = {
       console.log('👤 Getting/creating profile for user:', user.id)
       
       // Prima prova a ottenere il profilo esistente
-      let profile = await this.getProfile(user.id)
+      let profile = await authService.getProfile(user.id)
       
       if (profile) {
         console.log('✅ Profile found:', profile.name)
@@ -323,7 +323,7 @@ const authService = {
       toast.success('Profilo aggiornato con successo!')
       return data
     } catch (error) {
-      const message = this.getErrorMessage(error)
+      const message = authService.getErrorMessage(error)
       toast.error(message)
       throw new Error(message)
     }
@@ -365,7 +365,7 @@ const authService = {
       if (error) throw error
       toast.success('Email di reset inviata!')
     } catch (error) {
-      const message = this.getErrorMessage(error)
+      const message = authService.getErrorMessage(error)
       toast.error(message)
       throw new Error(message)
     }
