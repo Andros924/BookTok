@@ -1,18 +1,19 @@
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, Menu, X, User, LogOut, Home, Plus, Library } from 'lucide-react';
+import React, { useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import { BookOpen, Menu, X, User, LogOut, Home, Plus, Library, Users } from 'lucide-react'
 
 function Header({ user, onLogout }) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const location = useLocation();
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const location = useLocation()
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'La Mia Libreria', href: '/books', icon: Library },
     { name: 'Aggiungi Libro', href: '/add-book', icon: Plus },
-  ];
+    { name: 'Prestiti', href: '/loans', icon: Users },
+  ]
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => location.pathname === path
 
   return (
     <header className="bg-white shadow-lg border-b border-gray-200">
@@ -30,7 +31,7 @@ function Header({ user, onLogout }) {
             {/* Desktop navigation */}
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               {navigation.map((item) => {
-                const Icon = item.icon;
+                const Icon = item.icon
                 return (
                   <Link
                     key={item.name}
@@ -44,7 +45,7 @@ function Header({ user, onLogout }) {
                     <Icon className="h-4 w-4 mr-2" />
                     {item.name}
                   </Link>
-                );
+                )
               })}
             </div>
           </div>
@@ -94,7 +95,7 @@ function Header({ user, onLogout }) {
           <div className="sm:hidden">
             <div className="pt-2 pb-3 space-y-1">
               {navigation.map((item) => {
-                const Icon = item.icon;
+                const Icon = item.icon
                 return (
                   <Link
                     key={item.name}
@@ -109,7 +110,7 @@ function Header({ user, onLogout }) {
                     <Icon className="h-5 w-5 mr-3" />
                     {item.name}
                   </Link>
-                );
+                )
               })}
             </div>
             
@@ -134,8 +135,8 @@ function Header({ user, onLogout }) {
                 </Link>
                 <button
                   onClick={() => {
-                    setIsMenuOpen(false);
-                    onLogout();
+                    setIsMenuOpen(false)
+                    onLogout()
                   }}
                   className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
                 >
@@ -147,7 +148,7 @@ function Header({ user, onLogout }) {
         )}
       </nav>
     </header>
-  );
+  )
 }
 
-export default Header;
+export default Header
