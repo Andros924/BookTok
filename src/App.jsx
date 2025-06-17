@@ -18,20 +18,25 @@ function App() {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
+    let isMounted = true
+    
     const checkAuth = async () => {
       try {
-        console.log('🔍 Checking authentication status...')
+        console.log('🔍 Starting auth check...')
         
         const session = await authService.getSession()
-        console.log('📋 Session check:', !!session)
+        console.log('📋 Session check result:', !!session)
         
-        if (session) {
-          const userData = await authService.getCurrentUser()
-          console.log('👤 User data:', userData ? 'Found' : 'Not found')
+        if (session && session.user) {
+          console.log('👤 Session found, getting user data...')
           
-          if (userData) {
+          const userData = await authService.getCurrentUser()
+          console.log('📊 User data result:', userData ? 'Success' : 'Failed')
+          
+          if (userData && isMounted) {
             setIsAuthenticated(true)
             setUser(userData.user)
             setProfile(userData.profile)
@@ -39,11 +44,25 @@ function App() {
           }
         } else {
           console.log('❌ No active session found')
+          if (isMounted) {
+            setIsAuthenticated(false)
+            setUser(null)
+            setProfile(null)
+          }
         }
       } catch (error) {
         console.error('💥 Auth check error:', error)
+        if (isMounted) {
+          setIsAuthenticated(false)
+          setUser(null)
+          setProfile(null)
+        }
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+          setAuthChecked(true)
+          console.log('🏁 Auth check completed')
+        }
       }
     }
 
@@ -53,19 +72,30 @@ function App() {
     const { data: { subscription } } = authService.onAuthStateChange(async (event, session) => {
       console.log('🔄 Auth state changed:', event, !!session)
       
+      if (!isMounted) return
+      
       if (event === 'SIGNED_IN' && session) {
-        console.log('✅ User signed in')
-        const userData = await authService.getCurrentUser()
-        if (userData) {
-          setIsAuthenticated(true)
-          setUser(userData.user)
-          setProfile(userData.profile)
+        console.log('✅ User signed in, getting profile...')
+        
+        try {
+          const userData = await authService.getCurrentUser()
+          if (userData && isMounted) {
+            setIsAuthenticated(true)
+            setUser(userData.user)
+            setProfile(userData.profile)
+            console.log('✅ Profile loaded after sign in')
+          }
+        } catch (error) {
+          console.error('❌ Error loading profile after sign in:', error)
         }
+        
       } else if (event === 'SIGNED_OUT') {
         console.log('👋 User signed out')
-        setIsAuthenticated(false)
-        setUser(null)
-        setProfile(null)
+        if (isMounted) {
+          setIsAuthenticated(false)
+          setUser(null)
+          setProfile(null)
+        }
       } else if (event === 'TOKEN_REFRESHED') {
         console.log('🔄 Token refreshed')
       }
@@ -73,6 +103,7 @@ function App() {
 
     return () => {
       console.log('🧹 Cleaning up auth listener')
+      isMounted = false
       subscription.unsubscribe()
     }
   }, [])
@@ -88,7 +119,8 @@ function App() {
     }
   }
 
-  if (loading) {
+  // Mostra loading solo se non abbiamo ancora controllato l'auth
+  if (loading || !authChecked) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -130,35 +162,35 @@ function App() {
         <main className={isAuthenticated ? "pt-4" : ""}>
           <Routes>
             <Route path="/login" element={
-              isAuthenticated ? <Navigate to="/dashboard" /> : 
+              isAuthenticated ? <Navigate to="/dashboard" replace /> : 
               <Login setIsAuthenticated={setIsAuthenticated} setUser={setUser} setProfile={setProfile} />
             } />
             <Route path="/register" element={
-              isAuthenticated ? <Navigate to="/dashboard" /> : 
+              isAuthenticated ? <Navigate to="/dashboard" replace /> : 
               <Register setIsAuthenticated={setIsAuthenticated} setUser={setUser} setProfile={setProfile} />
             } />
             <Route path="/dashboard" element={
-              isAuthenticated ? <Dashboard /> : <Navigate to="/login" />
+              isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />
             } />
             <Route path="/books" element={
-              isAuthenticated ? <BookList /> : <Navigate to="/login" />
+              isAuthenticated ? <BookList /> : <Navigate to="/login" replace />
             } />
             <Route path="/books/:id" element={
-              isAuthenticated ? <BookDetail /> : <Navigate to="/login" />
+              isAuthenticated ? <BookDetail /> : <Navigate to="/login" replace />
             } />
             <Route path="/add-book" element={
-              isAuthenticated ? <AddBook /> : <Navigate to="/login" />
+              isAuthenticated ? <AddBook /> : <Navigate to="/login" replace />
             } />
             <Route path="/loans" element={
-              isAuthenticated ? <LoanList /> : <Navigate to="/login" />
+              isAuthenticated ? <LoanList /> : <Navigate to="/login" replace />
             } />
             <Route path="/loans/new" element={
-              isAuthenticated ? <NewLoan /> : <Navigate to="/login" />
+              isAuthenticated ? <NewLoan /> : <Navigate to="/login" replace />
             } />
             <Route path="/profile" element={
-              isAuthenticated ? <Profile user={profile} setUser={setProfile} /> : <Navigate to="/login" />
+              isAuthenticated ? <Profile user={profile} setUser={setProfile} /> : <Navigate to="/login" replace />
             } />
-            <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
+            <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
           </Routes>
         </main>
       </div>

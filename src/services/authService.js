@@ -50,10 +50,10 @@ const authService = {
         console.log('✅ User registered and confirmed immediately')
         
         // Aspetta un momento per il trigger del database
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise(resolve => setTimeout(resolve, 2000))
         
         // Verifica che il profilo sia stato creato dal trigger
-        const profile = await this.getProfile(authData.user.id)
+        const profile = await this.waitForProfile(authData.user.id, 5000)
         
         toast.success('Registrazione completata con successo!')
         return { 
@@ -80,6 +80,49 @@ const authService = {
     }
   },
 
+  // Aspetta che il profilo sia creato dal trigger
+  waitForProfile: async (userId, timeout = 5000) => {
+    const startTime = Date.now()
+    
+    while (Date.now() - startTime < timeout) {
+      try {
+        const profile = await this.getProfile(userId)
+        if (profile) {
+          console.log('✅ Profile found after waiting:', profile.name)
+          return profile
+        }
+        
+        // Aspetta 500ms prima di riprovare
+        await new Promise(resolve => setTimeout(resolve, 500))
+      } catch (error) {
+        console.log('⏳ Still waiting for profile creation...')
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+    }
+    
+    console.log('⚠️ Profile not found after timeout, creating fallback')
+    return this.createFallbackProfile(userId)
+  },
+
+  // Crea profilo di fallback
+  createFallbackProfile: async (userId) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not found')
+      
+      return {
+        id: userId,
+        name: user.user_metadata?.name || user.email.split('@')[0],
+        email: user.email,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    } catch (error) {
+      console.error('Error creating fallback profile:', error)
+      return null
+    }
+  },
+
   // Login utente
   login: async (email, password) => {
     try {
@@ -102,7 +145,7 @@ const authService = {
         throw new Error('Login fallito')
       }
 
-      // Ottieni il profilo utente
+      // Ottieni il profilo utente con retry
       const profile = await this.getOrCreateProfile(data.user)
 
       toast.success('Login effettuato con successo!')
@@ -131,13 +174,29 @@ const authService = {
   // Ottieni utente corrente con profilo
   getCurrentUser: async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return null
+      console.log('🔍 Getting current user...')
+      
+      const { data: { user }, error } = await supabase.auth.getUser()
+      
+      if (error) {
+        console.error('❌ Error getting user:', error)
+        return null
+      }
+      
+      if (!user) {
+        console.log('❌ No user found')
+        return null
+      }
 
+      console.log('👤 User found:', user.id)
+      
       const profile = await this.getOrCreateProfile(user)
+      
+      console.log('📋 Profile result:', profile ? 'Found' : 'Not found')
+      
       return { user, profile }
     } catch (error) {
-      console.error('Error getting current user:', error)
+      console.error('💥 Error getting current user:', error)
       return null
     }
   },
@@ -145,26 +204,33 @@ const authService = {
   // Ottieni profilo esistente
   getProfile: async (userId) => {
     try {
+      console.log('🔍 Fetching profile for user:', userId)
+      
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single()
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching profile:', error)
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.log('📭 Profile not found (PGRST116)')
+          return null
+        }
+        console.error('❌ Error fetching profile:', error)
         return null
       }
 
+      console.log('✅ Profile found:', profile?.name)
       return profile
     } catch (error) {
-      console.error('Error in getProfile:', error)
+      console.error('💥 Error in getProfile:', error)
       return null
     }
   },
 
   // Ottieni o crea profilo utente
-  getOrCreateProfile: async (user) => {
+  getOrCreateProfile: async (user, maxRetries = 3) => {
     try {
       console.log('👤 Getting/creating profile for user:', user.id)
       
@@ -176,38 +242,63 @@ const authService = {
         return profile
       }
 
-      console.log('🔨 Profile not found, creating new one...')
+      console.log('🔨 Profile not found, attempting to create...')
       
-      // Se non esiste, crealo
-      const { data: newProfile, error: createError } = await supabase
-        .from('profiles')
-        .insert({
-          id: user.id,
-          name: user.user_metadata?.name || user.email.split('@')[0],
-          email: user.email,
-        })
-        .select()
-        .single()
+      // Prova a creare il profilo con retry
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              name: user.user_metadata?.name || user.email.split('@')[0],
+              email: user.email,
+            })
+            .select()
+            .single()
 
-      if (createError) {
-        console.error('❌ Profile creation failed:', createError)
-        // Ritorna un profilo di fallback
-        return {
-          id: user.id,
-          name: user.user_metadata?.name || user.email.split('@')[0],
-          email: user.email
+          if (createError) {
+            console.error(`❌ Profile creation attempt ${attempt} failed:`, createError)
+            
+            if (attempt === maxRetries) {
+              throw createError
+            }
+            
+            // Aspetta prima di riprovare
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+            continue
+          }
+
+          console.log('✅ Profile created successfully:', newProfile.name)
+          return newProfile
+
+        } catch (retryError) {
+          console.error(`💥 Retry ${attempt} failed:`, retryError)
+          
+          if (attempt === maxRetries) {
+            break
+          }
         }
       }
 
-      console.log('✅ Profile created successfully:', newProfile.name)
-      return newProfile
+      // Se tutto fallisce, ritorna un profilo di fallback
+      console.log('⚠️ All creation attempts failed, using fallback profile')
+      return {
+        id: user.id,
+        name: user.user_metadata?.name || user.email.split('@')[0],
+        email: user.email,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
 
     } catch (error) {
       console.error('💥 Error with profile:', error)
       return {
         id: user.id,
         name: user.user_metadata?.name || user.email.split('@')[0],
-        email: user.email
+        email: user.email,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       }
     }
   },
@@ -241,17 +332,28 @@ const authService = {
   // Ottieni sessione corrente
   getSession: async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      console.log('🔍 Getting session...')
+      const { data: { session }, error } = await supabase.auth.getSession()
+      
+      if (error) {
+        console.error('❌ Error getting session:', error)
+        return null
+      }
+      
+      console.log('📋 Session result:', !!session)
       return session
     } catch (error) {
-      console.error('Error getting session:', error)
+      console.error('💥 Error getting session:', error)
       return null
     }
   },
 
   // Listener per cambiamenti di autenticazione
   onAuthStateChange: (callback) => {
-    return supabase.auth.onAuthStateChange(callback)
+    return supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔄 Auth state change:', event, !!session)
+      callback(event, session)
+    })
   },
 
   // Reset password
