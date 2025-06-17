@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Search, Filter, Star, Eye, Clock, CheckCircle } from 'lucide-react';
+import { BookOpen, Search, Filter, Star, Eye, Clock, CheckCircle, Grid, List } from 'lucide-react';
 import bookService from '../services/bookService';
 
 function BookList() {
@@ -10,6 +10,7 @@ function BookList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('created_at');
+  const [viewMode, setViewMode] = useState('grid');
 
   useEffect(() => {
     const fetchBooks = async () => {
@@ -92,7 +93,7 @@ function BookList() {
         {[...Array(5)].map((_, i) => (
           <Star
             key={i}
-            className={`h-4 w-4 ${
+            className={`h-3 w-3 sm:h-4 sm:w-4 ${
               i < rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
             }`}
           />
@@ -103,31 +104,38 @@ function BookList() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="text-center">Caricamento...</div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Caricamento...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-      <div className="px-4 py-6 sm:px-0">
-        <div className="flex justify-between items-center mb-8">
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 sm:mb-8 gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">La Mia Libreria</h1>
-            <p className="mt-2 text-gray-600">{filteredBooks.length} libri nella tua collezione</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">La Mia Libreria</h1>
+            <p className="mt-2 text-sm sm:text-base text-gray-600">
+              {filteredBooks.length} libri nella tua collezione
+            </p>
           </div>
           <Link
             to="/add-book"
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors duration-200"
+            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors duration-200 text-center text-sm sm:text-base"
           >
             Aggiungi Libro
           </Link>
         </div>
 
         {/* Filters and Search */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6 sm:mb-8">
+          <div className="space-y-4">
+            {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
@@ -135,41 +143,69 @@ function BookList() {
                 placeholder="Cerca libri..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-3 py-2 w-full border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                className="pl-10 pr-3 py-2 w-full border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
               />
             </div>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option value="all">Tutti gli stati</option>
-              <option value="to_read">Da leggere</option>
-              <option value="reading">In lettura</option>
-              <option value="read">Letti</option>
-            </select>
+            {/* Filters Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
+              >
+                <option value="all">Tutti gli stati</option>
+                <option value="to_read">Da leggere</option>
+                <option value="reading">In lettura</option>
+                <option value="read">Letti</option>
+              </select>
 
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option value="created_at">Data aggiunta</option>
-              <option value="title">Titolo</option>
-              <option value="author">Autore</option>
-              <option value="year">Anno</option>
-              <option value="rating">Valutazione</option>
-            </select>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
+              >
+                <option value="created_at">Data aggiunta</option>
+                <option value="title">Titolo</option>
+                <option value="author">Autore</option>
+                <option value="year">Anno</option>
+                <option value="rating">Valutazione</option>
+              </select>
 
-            <div className="flex items-center text-sm text-gray-500">
-              <Filter className="h-4 w-4 mr-2" />
-              {filteredBooks.length} risultati
+              {/* View Mode Toggle */}
+              <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
+                    viewMode === 'grid'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <Grid className="h-4 w-4 mx-auto" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <List className="h-4 w-4 mx-auto" />
+                </button>
+              </div>
+
+              {/* Results Count */}
+              <div className="flex items-center text-sm text-gray-500 px-3 py-2">
+                <Filter className="h-4 w-4 mr-2" />
+                {filteredBooks.length} risultati
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Books Grid */}
+        {/* Books Display */}
         {filteredBooks.length === 0 ? (
           <div className="text-center py-12">
             <BookOpen className="mx-auto h-12 w-12 text-gray-400" />
@@ -191,8 +227,8 @@ function BookList() {
               </div>
             )}
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        ) : viewMode === 'grid' ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
             {filteredBooks.map((book) => (
               <Link
                 key={book.id}
@@ -204,22 +240,22 @@ function BookList() {
                     <img
                       src={book.cover_image}
                       alt={book.title}
-                      className="w-full h-48 object-cover"
+                      className="w-full h-32 sm:h-40 lg:h-48 object-cover"
                     />
                   ) : (
-                    <div className="w-full h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                      <BookOpen className="h-12 w-12 text-gray-400" />
+                    <div className="w-full h-32 sm:h-40 lg:h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                      <BookOpen className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 text-gray-400" />
                     </div>
                   )}
                 </div>
                 
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 text-sm line-clamp-2 mb-2">
+                <div className="p-2 sm:p-3 lg:p-4">
+                  <h3 className="font-semibold text-gray-900 text-xs sm:text-sm line-clamp-2 mb-1">
                     {book.title}
                   </h3>
-                  <p className="text-gray-600 text-xs mb-2">{book.author}</p>
+                  <p className="text-gray-600 text-xs mb-1 sm:mb-2 truncate">{book.author}</p>
                   
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-1 sm:mb-2">
                     <span className="text-gray-500 text-xs">{book.year}</span>
                     {renderStars(book.rating)}
                   </div>
@@ -227,7 +263,7 @@ function BookList() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1">
                       {getStatusIcon(book.read_status)}
-                      <span className="text-xs text-gray-600">
+                      <span className="text-xs text-gray-600 hidden sm:inline">
                         {getStatusText(book.read_status)}
                       </span>
                     </div>
@@ -240,10 +276,58 @@ function BookList() {
               </Link>
             ))}
           </div>
+        ) : (
+          <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+            <div className="divide-y divide-gray-200">
+              {filteredBooks.map((book) => (
+                <Link
+                  key={book.id}
+                  to={`/books/${book.id}`}
+                  className="block p-4 sm:p-6 hover:bg-gray-50 transition-colors duration-200"
+                >
+                  <div className="flex items-center space-x-4">
+                    {book.cover_image ? (
+                      <img
+                        src={book.cover_image}
+                        alt={book.title}
+                        className="w-12 h-16 sm:w-16 sm:h-20 object-cover rounded flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-16 sm:w-16 sm:h-20 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
+                        <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
+                      </div>
+                    )}
+                    
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 text-sm sm:text-base line-clamp-1">
+                        {book.title}
+                      </h3>
+                      <p className="text-gray-600 text-xs sm:text-sm mt-1">{book.author}</p>
+                      
+                      <div className="flex items-center gap-4 mt-2 text-xs sm:text-sm text-gray-500">
+                        <span>{book.year}</span>
+                        {book.pages && <span>{book.pages} pp.</span>}
+                        <div className="flex items-center gap-1">
+                          {getStatusIcon(book.read_status)}
+                          <span>{getStatusText(book.read_status)}</span>
+                        </div>
+                      </div>
+                      
+                      {book.rating && (
+                        <div className="mt-2">
+                          {renderStars(book.rating)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>
-  );
+  )
 }
 
 export default BookList;
