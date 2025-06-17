@@ -437,22 +437,24 @@ function BookList() {
                   className="block p-4 sm:p-6 hover:bg-gray-50 transition-colors duration-200"
                 >
                   <div className="flex items-center space-x-4">
-                    {book.cover_image ? (
-                      <img
-                        src={book.cover_image}
-                        alt={book.title}
-                        className="w-12 h-16 sm:w-16 sm:h-20 object-cover rounded flex-shrink-0"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.nextSibling.style.display = 'flex';
-                        }}
-                      />
-                    ) : null}
-                    <div 
-                      className="w-12 h-16 sm:w-16 sm:h-20 bg-gray-200 rounded flex items-center justify-center flex-shrink-0"
-                      style={{display: book.cover_image ? 'none' : 'flex'}}
-                    >
-                      <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
+                    <div className="flex-shrink-0">
+                      {book.cover_image ? (
+                        <img
+                          src={book.cover_image}
+                          alt={book.title}
+                          className="w-12 h-16 sm:w-16 sm:h-20 object-cover rounded"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div 
+                        className="w-12 h-16 sm:w-16 sm:h-20 bg-gray-200 rounded flex items-center justify-center"
+                        style={{display: book.cover_image ? 'none' : 'flex'}}
+                      >
+                        <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
+                      </div>
                     </div>
                     
                     <div className="flex-1 min-w-0">
@@ -468,7 +470,7 @@ function BookList() {
                           
                           <div className="flex items-center gap-4 mt-2 text-xs sm:text-sm text-gray-500">
                             <span>{book.year}</span>
-                            {book.pages && <span>{book.pages} pp.</span>
+                            {book.pages && <span>{book.pages} pp.</span>}
                           </div>
                           
                           {book.rating && (
