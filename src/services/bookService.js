@@ -370,25 +370,37 @@ const bookService = {
     }
   },
 
-  // Aggiorna stato di lettura
+  // Aggiorna stato di lettura - VERSIONE CORRETTA
   updateReadingStatus: async (bookId, status, additionalData = {}) => {
     try {
+      console.log('📖 Updating reading status:', { bookId, status, additionalData })
+      
+      if (!bookId) {
+        throw new Error('ID libro non fornito')
+      }
+
       const updateData = {
         read_status: status,
         updated_at: new Date().toISOString(),
         ...additionalData
       }
 
-      // Aggiungi date automatiche
+      // Aggiungi date automatiche se non fornite
       if (status === 'reading' && !updateData.date_started) {
         updateData.date_started = new Date().toISOString()
+        console.log('📅 Adding start date automatically')
       }
       if (status === 'read' && !updateData.date_finished) {
         updateData.date_finished = new Date().toISOString()
+        console.log('📅 Adding finish date automatically')
       }
 
-      return await this.updateBook(bookId, updateData)
+      // Usa la funzione updateBook invece di this.updateBook
+      const result = await bookService.updateBook(bookId, updateData)
+      console.log('✅ Reading status updated successfully')
+      return result
     } catch (error) {
+      console.error('❌ Error updating reading status:', error)
       throw error
     }
   },
@@ -809,12 +821,31 @@ const bookService = {
     return isbn13?.identifier || isbn10?.identifier || other?.identifier || ''
   },
 
-  // Aggiungi ai preferiti
+  // Aggiungi ai preferiti - VERSIONE CORRETTA
   toggleFavorite: async (bookId) => {
     try {
-      const book = await this.getBook(bookId)
-      return await this.updateBook(bookId, { is_favorite: !book.is_favorite })
+      console.log('❤️ Toggling favorite for book:', bookId)
+      
+      if (!bookId) {
+        throw new Error('ID libro non fornito')
+      }
+
+      // Prima ottieni il libro corrente
+      const book = await bookService.getBook(bookId)
+      
+      if (!book) {
+        throw new Error('Libro non trovato')
+      }
+
+      // Poi aggiorna lo stato preferito
+      const result = await bookService.updateBook(bookId, { 
+        is_favorite: !book.is_favorite 
+      })
+      
+      console.log('✅ Favorite toggled successfully')
+      return result
     } catch (error) {
+      console.error('❌ Error toggling favorite:', error)
       throw error
     }
   },
@@ -822,7 +853,7 @@ const bookService = {
   // Ottieni libri per genere
   getBooksByGenre: async () => {
     try {
-      const books = await this.getAllBooks()
+      const books = await bookService.getAllBooks()
       const genreStats = {}
 
       books.forEach(book => {
