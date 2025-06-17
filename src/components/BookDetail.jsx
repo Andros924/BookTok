@@ -8,37 +8,56 @@ function BookDetail() {
   const navigate = useNavigate();
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
   useEffect(() => {
     const fetchBook = async () => {
+      if (!id) {
+        console.error('❌ No book ID provided');
+        setError('ID libro mancante');
+        setLoading(false);
+        return;
+      }
+
       try {
         console.log('📖 Fetching book with ID:', id);
+        setLoading(true);
+        setError(null);
+        
         const bookData = await bookService.getBook(id);
-        console.log('✅ Book found:', bookData);
-        setBook(bookData);
+        
+        if (!bookData) {
+          console.error('❌ Book not found for ID:', id);
+          setError('Libro non trovato');
+          setBook(null);
+        } else {
+          console.log('✅ Book found:', bookData.title);
+          setBook(bookData);
+          setError(null);
+        }
       } catch (error) {
         console.error('❌ Error fetching book:', error);
+        setError(error.message || 'Errore nel caricamento del libro');
         setBook(null);
       } finally {
         setLoading(false);
       }
     };
 
-    if (id) {
-      fetchBook();
-    } else {
-      setLoading(false);
-    }
+    fetchBook();
   }, [id]);
 
   const handleDelete = async () => {
+    if (!book) return;
+    
     try {
-      await bookService.deleteBook(id);
+      console.log('🗑️ Deleting book:', book.id);
+      await bookService.deleteBook(book.id);
       navigate('/books');
     } catch (error) {
-      console.error('Error deleting book:', error);
+      console.error('❌ Error deleting book:', error);
     }
   };
 
@@ -59,7 +78,7 @@ function BookDetail() {
         additionalData.date_finished = new Date().toISOString();
       }
       
-      const updatedBook = await bookService.updateReadingStatus(id, newStatus, additionalData);
+      const updatedBook = await bookService.updateReadingStatus(book.id, newStatus, additionalData);
       setBook(updatedBook);
       
     } catch (error) {
@@ -74,7 +93,7 @@ function BookDetail() {
     
     setUpdatingStatus(true);
     try {
-      const updatedBook = await bookService.toggleFavorite(id);
+      const updatedBook = await bookService.toggleFavorite(book.id);
       setBook(updatedBook);
     } catch (error) {
       console.error('❌ Error toggling favorite:', error);
@@ -148,6 +167,7 @@ function BookDetail() {
     });
   };
 
+  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -159,22 +179,38 @@ function BookDetail() {
     );
   }
 
-  if (!book) {
+  // Error state
+  if (error || !book) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto px-4">
           <BookOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Libro non trovato</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            {error || 'Libro non trovato'}
+          </h2>
           <p className="text-gray-600 mb-6">
-            Il libro che stai cercando non esiste o non hai i permessi per visualizzarlo.
+            {error === 'ID libro mancante' 
+              ? 'L\'ID del libro non è valido.'
+              : 'Il libro che stai cercando non esiste o non hai i permessi per visualizzarlo.'
+            }
           </p>
-          <Link 
-            to="/books" 
-            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Torna alla libreria
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link 
+              to="/books" 
+              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Torna alla libreria
+            </Link>
+            {id && (
+              <button
+                onClick={() => window.location.reload()}
+                className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Riprova
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -209,13 +245,13 @@ function BookDetail() {
               </span>
             </button>
             
-            <button
-              onClick={() => navigate(`/books/${id}/edit`)}
+            <Link
+              to={`/books/${id}/edit`}
               className="flex items-center px-3 py-2 text-indigo-600 border border-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors"
             >
               <Edit className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Modifica</span>
-            </button>
+            </Link>
             
             <button
               onClick={() => setShowDeleteModal(true)}
@@ -232,22 +268,24 @@ function BookDetail() {
           <div className="lg:flex">
             {/* Cover Image */}
             <div className="lg:w-1/3 xl:w-1/4">
-              {book.cover_image ? (
-                <img
-                  src={book.cover_image}
-                  alt={book.title}
-                  className="w-full h-64 sm:h-80 lg:h-full object-cover"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'flex';
-                  }}
-                />
-              ) : null}
-              <div 
-                className="w-full h-64 sm:h-80 lg:h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center"
-                style={{display: book.cover_image ? 'none' : 'flex'}}
-              >
-                <BookOpen className="h-16 w-16 sm:h-24 sm:w-24 text-gray-400" />
+              <div className="relative">
+                {book.cover_image ? (
+                  <img
+                    src={book.cover_image}
+                    alt={book.title}
+                    className="w-full h-64 sm:h-80 lg:h-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div 
+                  className="w-full h-64 sm:h-80 lg:h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center"
+                  style={{display: book.cover_image ? 'none' : 'flex'}}
+                >
+                  <BookOpen className="h-16 w-16 sm:h-24 sm:w-24 text-gray-400" />
+                </div>
               </div>
             </div>
 

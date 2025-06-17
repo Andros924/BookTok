@@ -37,20 +37,36 @@ const bookService = {
 
       const { data, error } = await query
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Database error in getAllBooks:', error)
+        throw error
+      }
+      
+      console.log('✅ getAllBooks success:', data?.length || 0, 'books found')
       return data || []
     } catch (error) {
       const message = error.message || 'Errore nel recupero dei libri'
+      console.error('💥 getAllBooks error:', message)
       toast.error(message)
       throw new Error(message)
     }
   },
 
-  // Ottieni un libro specifico
+  // Ottieni un libro specifico - VERSIONE MIGLIORATA
   getBook: async (bookId) => {
     try {
+      console.log('🔍 Getting book with ID:', bookId)
+      
+      if (!bookId) {
+        throw new Error('ID libro non fornito')
+      }
+
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Utente non autenticato')
+      if (!user) {
+        throw new Error('Utente non autenticato')
+      }
+
+      console.log('👤 User authenticated:', user.id)
 
       const { data, error } = await supabase
         .from('books')
@@ -59,11 +75,32 @@ const bookService = {
         .eq('user_id', user.id)
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Database error in getBook:', error)
+        
+        if (error.code === 'PGRST116') {
+          throw new Error('Libro non trovato')
+        }
+        
+        throw error
+      }
+
+      if (!data) {
+        console.error('❌ No book data returned')
+        throw new Error('Libro non trovato')
+      }
+
+      console.log('✅ Book found successfully:', data.title)
       return data
     } catch (error) {
       const message = error.message || 'Errore nel recupero del libro'
-      toast.error(message)
+      console.error('💥 getBook error:', message)
+      
+      // Non mostrare toast per errori di "non trovato" - li gestisce il componente
+      if (!message.includes('non trovato') && !message.includes('not found')) {
+        toast.error(message)
+      }
+      
       throw new Error(message)
     }
   },
@@ -171,6 +208,10 @@ const bookService = {
     try {
       console.log('📝 Updating book:', bookId, bookData)
       
+      if (!bookId) {
+        throw new Error('ID libro non fornito')
+      }
+
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Utente non autenticato')
 
@@ -276,7 +317,16 @@ const bookService = {
 
       if (error) {
         console.error('❌ Database update error:', error)
+        
+        if (error.code === 'PGRST116') {
+          throw new Error('Libro non trovato o non autorizzato')
+        }
+        
         throw error
+      }
+
+      if (!data) {
+        throw new Error('Nessun libro aggiornato - verifica i permessi')
       }
 
       console.log('✅ Book updated successfully')
@@ -293,6 +343,10 @@ const bookService = {
   // Elimina libro
   deleteBook: async (bookId) => {
     try {
+      if (!bookId) {
+        throw new Error('ID libro non fornito')
+      }
+
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Utente non autenticato')
 
@@ -302,10 +356,15 @@ const bookService = {
         .eq('id', bookId)
         .eq('user_id', user.id)
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Database delete error:', error)
+        throw error
+      }
+
       toast.success('Libro eliminato con successo!')
     } catch (error) {
       const message = error.message || 'Errore nell\'eliminazione del libro'
+      console.error('💥 Delete book error:', message)
       toast.error(message)
       throw new Error(message)
     }
@@ -809,6 +868,9 @@ const bookService = {
     }
     if (message.includes('new row violates row-level security policy')) {
       return 'Non hai i permessi per questa operazione'
+    }
+    if (message.includes('PGRST116')) {
+      return 'Libro non trovato'
     }
     
     return message || 'Errore sconosciuto'
