@@ -4,6 +4,11 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://zaityklszcaqpgifkjow.supabase.co'
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InphaXR5a2xzemNhcXBnaWZram93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxNDg3NTksImV4cCI6MjA2NTcyNDc1OX0.rdZpTEwh-neKq4rRVBaEeFE5VxFChIcwB-EilQiDRRo'
 
+console.log('Supabase Config:', {
+  url: supabaseUrl,
+  hasKey: !!supabaseAnonKey
+})
+
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables')
   console.error('VITE_SUPABASE_URL:', supabaseUrl ? 'Set' : 'Missing')
@@ -15,8 +20,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce'
+    detectSessionInUrl: false, // Cambiato da true a false
+    flowType: 'implicit' // Cambiato da 'pkce' a 'implicit'
   },
   realtime: {
     params: {
@@ -27,6 +32,15 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     headers: {
       'X-Client-Info': 'libreria-app'
     }
+  }
+})
+
+// Test della connessione
+supabase.auth.getSession().then(({ data, error }) => {
+  if (error) {
+    console.error('Supabase connection error:', error)
+  } else {
+    console.log('Supabase connected successfully')
   }
 })
 

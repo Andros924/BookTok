@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { BookOpen, User, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import authService from '../services/authService';
 
-function Register({ setIsAuthenticated, setUser }) {
+function Register({ setIsAuthenticated, setUser, setProfile }) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -22,32 +22,65 @@ function Register({ setIsAuthenticated, setUser }) {
     });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const validateForm = () => {
+    if (!formData.name.trim()) {
+      alert('Il nome è obbligatorio');
+      return false;
+    }
+    
+    if (!formData.email.trim()) {
+      alert('L\'email è obbligatoria');
+      return false;
+    }
+    
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      alert('Formato email non valido');
+      return false;
+    }
+    
+    if (formData.password.length < 6) {
+      alert('La password deve essere di almeno 6 caratteri');
+      return false;
+    }
     
     if (formData.password !== formData.confirmPassword) {
       alert('Le password non coincidono');
-      return;
+      return false;
     }
+    
+    return true;
+  };
 
-    if (formData.password.length < 6) {
-      alert('La password deve essere di almeno 6 caratteri');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
       return;
     }
 
     setLoading(true);
     try {
+      console.log('Starting registration process...');
+      
       const { user } = await authService.register({
-        name: formData.name,
-        email: formData.email,
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
         password: formData.password
       });
       
-      setIsAuthenticated(true);
-      setUser(user);
-      navigate('/dashboard');
+      console.log('Registration successful:', user);
+      
+      // Ottieni il profilo dell'utente
+      const userData = await authService.getCurrentUser();
+      if (userData) {
+        setIsAuthenticated(true);
+        setUser(userData.user);
+        setProfile(userData.profile);
+        navigate('/dashboard');
+      }
     } catch (error) {
-      // Error is handled in authService
+      console.error('Registration failed:', error);
+      // L'errore è già gestito nel service
     } finally {
       setLoading(false);
     }

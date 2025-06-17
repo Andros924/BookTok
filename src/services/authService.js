@@ -5,37 +5,53 @@ const authService = {
   // Registrazione utente con profilo
   register: async (userData) => {
     try {
+      console.log('Attempting registration with:', { email: userData.email, name: userData.name })
+      
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: userData.email,
         password: userData.password,
         options: {
           data: {
             name: userData.name
-          }
+          },
+          emailRedirectTo: undefined // Disabilita email confirmation per ora
         }
       })
 
-      if (authError) throw authError
+      console.log('Auth response:', { authData, authError })
+
+      if (authError) {
+        console.error('Auth error:', authError)
+        throw authError
+      }
 
       if (authData.user) {
-        // Crea il profilo utente
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: authData.user.id,
-            name: userData.name,
-            email: userData.email,
-          })
+        // Aspetta un momento prima di creare il profilo
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        try {
+          // Crea il profilo utente
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: authData.user.id,
+              name: userData.name,
+              email: userData.email,
+            })
 
-        if (profileError) {
-          console.warn('Profile creation error:', profileError)
-          // Non bloccare la registrazione se il profilo non viene creato
+          if (profileError) {
+            console.warn('Profile creation error:', profileError)
+            // Non bloccare la registrazione se il profilo non viene creato
+          }
+        } catch (profileErr) {
+          console.warn('Profile creation failed:', profileErr)
         }
 
         toast.success('Registrazione completata con successo!')
         return { user: authData.user }
       }
     } catch (error) {
+      console.error('Registration error:', error)
       const message = this.getErrorMessage(error)
       toast.error(message)
       throw new Error(message)
@@ -45,10 +61,14 @@ const authService = {
   // Login utente
   login: async (email, password) => {
     try {
+      console.log('Attempting login with:', { email })
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
+
+      console.log('Login response:', { data, error })
 
       if (error) throw error
 
@@ -58,6 +78,7 @@ const authService = {
       toast.success('Login effettuato con successo!')
       return { user: data.user, profile }
     } catch (error) {
+      console.error('Login error:', error)
       const message = this.getErrorMessage(error)
       toast.error(message)
       throw new Error(message)
@@ -111,10 +132,24 @@ const authService = {
           .select()
           .single()
 
-        if (createError) throw createError
+        if (createError) {
+          console.warn('Profile creation error:', createError)
+          // Ritorna un profilo di fallback
+          return {
+            id: user.id,
+            name: user.user_metadata?.name || user.email.split('@')[0],
+            email: user.email
+          }
+        }
         profile = newProfile
       } else if (error) {
-        throw error
+        console.warn('Profile fetch error:', error)
+        // Ritorna un profilo di fallback
+        return {
+          id: user.id,
+          name: user.user_metadata?.name || user.email.split('@')[0],
+          email: user.email
+        }
       }
 
       return profile
@@ -179,18 +214,33 @@ const authService = {
 
   // Gestione errori
   getErrorMessage: (error) => {
-    if (error.message.includes('Invalid login credentials')) {
+    console.log('Error details:', error)
+    
+    if (error.message?.includes('Invalid login credentials')) {
       return 'Credenziali non valide'
     }
-    if (error.message.includes('User already registered')) {
-      return 'Utente già registrato'
+    if (error.message?.includes('User already registered')) {
+      return 'Utente già registrato con questa email'
     }
-    if (error.message.includes('Password should be at least 6 characters')) {
+    if (error.message?.includes('Password should be at least 6 characters')) {
       return 'La password deve essere di almeno 6 caratteri'
     }
-    if (error.message.includes('Unable to validate email address')) {
+    if (error.message?.includes('Unable to validate email address')) {
       return 'Indirizzo email non valido'
     }
+    if (error.message?.includes('Email not confirmed')) {
+      return 'Email non confermata. Controlla la tua casella di posta.'
+    }
+    if (error.message?.includes('Signup is disabled')) {
+      return 'La registrazione è temporaneamente disabilitata'
+    }
+    if (error.message?.includes('Invalid email')) {
+      return 'Formato email non valido'
+    }
+    if (error.message?.includes('Weak password')) {
+      return 'Password troppo debole. Usa almeno 6 caratteri.'
+    }
+    
     return error.message || 'Errore sconosciuto'
   }
 }
