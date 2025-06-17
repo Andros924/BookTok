@@ -22,17 +22,26 @@ function App() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        console.log('🔍 Checking authentication status...')
+        
         const session = await authService.getSession()
+        console.log('📋 Session check:', !!session)
+        
         if (session) {
           const userData = await authService.getCurrentUser()
+          console.log('👤 User data:', userData ? 'Found' : 'Not found')
+          
           if (userData) {
             setIsAuthenticated(true)
             setUser(userData.user)
             setProfile(userData.profile)
+            console.log('✅ User authenticated successfully')
           }
+        } else {
+          console.log('❌ No active session found')
         }
       } catch (error) {
-        console.error('Auth check error:', error)
+        console.error('💥 Auth check error:', error)
       } finally {
         setLoading(false)
       }
@@ -42,7 +51,10 @@ function App() {
 
     // Ascolta i cambiamenti di autenticazione
     const { data: { subscription } } = authService.onAuthStateChange(async (event, session) => {
+      console.log('🔄 Auth state changed:', event, !!session)
+      
       if (event === 'SIGNED_IN' && session) {
+        console.log('✅ User signed in')
         const userData = await authService.getCurrentUser()
         if (userData) {
           setIsAuthenticated(true)
@@ -50,13 +62,19 @@ function App() {
           setProfile(userData.profile)
         }
       } else if (event === 'SIGNED_OUT') {
+        console.log('👋 User signed out')
         setIsAuthenticated(false)
         setUser(null)
         setProfile(null)
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log('🔄 Token refreshed')
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      console.log('🧹 Cleaning up auth listener')
+      subscription.unsubscribe()
+    }
   }, [])
 
   const handleLogout = async () => {
@@ -73,7 +91,10 @@ function App() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-xl text-gray-600">Caricamento...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Caricamento...</p>
+        </div>
       </div>
     )
   }
@@ -81,7 +102,30 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gray-50">
-        <Toaster position="top-right" />
+        <Toaster 
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: '#363636',
+              color: '#fff',
+            },
+            success: {
+              duration: 3000,
+              iconTheme: {
+                primary: '#4ade80',
+                secondary: '#fff',
+              },
+            },
+            error: {
+              duration: 5000,
+              iconTheme: {
+                primary: '#ef4444',
+                secondary: '#fff',
+              },
+            },
+          }}
+        />
         {isAuthenticated && <Header user={profile} onLogout={handleLogout} />}
         <main className={isAuthenticated ? "pt-4" : ""}>
           <Routes>

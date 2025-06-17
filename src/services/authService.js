@@ -5,76 +5,75 @@ const authService = {
   // Registrazione utente con profilo
   register: async (userData) => {
     try {
-      console.log('Attempting registration with:', { email: userData.email, name: userData.name })
+      console.log('🚀 Starting registration process...', { 
+        email: userData.email, 
+        name: userData.name 
+      })
       
+      // Validazione input
+      if (!userData.email || !userData.password || !userData.name) {
+        throw new Error('Tutti i campi sono obbligatori')
+      }
+
+      if (userData.password.length < 6) {
+        throw new Error('La password deve essere di almeno 6 caratteri')
+      }
+
+      // Registrazione utente
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: userData.email,
+        email: userData.email.trim().toLowerCase(),
         password: userData.password,
         options: {
           data: {
-            name: userData.name
-          },
-          emailRedirectTo: undefined // Disabilita email confirmation per ora
+            name: userData.name.trim()
+          }
         }
       })
 
-      console.log('Auth response:', { authData, authError })
+      console.log('📧 Auth registration response:', { 
+        user: authData.user?.id, 
+        session: !!authData.session,
+        error: authError 
+      })
 
       if (authError) {
-        console.error('Auth error:', authError)
+        console.error('❌ Registration auth error:', authError)
         throw authError
       }
 
-      if (authData.user) {
-        // Aspetta che l'utente sia completamente autenticato
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        
-        try {
-          console.log('Creating profile for user:', authData.user.id)
-          
-          // Crea il profilo utente con retry logic
-          let profileCreated = false
-          let attempts = 0
-          const maxAttempts = 3
-          
-          while (!profileCreated && attempts < maxAttempts) {
-            attempts++
-            console.log(`Profile creation attempt ${attempts}/${maxAttempts}`)
-            
-            const { data: profileData, error: profileError } = await supabase
-              .from('profiles')
-              .insert({
-                id: authData.user.id,
-                name: userData.name,
-                email: userData.email,
-              })
-              .select()
-              .single()
-
-            if (profileError) {
-              console.warn(`Profile creation attempt ${attempts} failed:`, profileError)
-              if (attempts < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, 1000))
-              }
-            } else {
-              console.log('Profile created successfully:', profileData)
-              profileCreated = true
-            }
-          }
-          
-          if (!profileCreated) {
-            console.warn('Profile creation failed after all attempts, but registration succeeded')
-          }
-        } catch (profileErr) {
-          console.warn('Profile creation failed:', profileErr)
-          // Non bloccare la registrazione se il profilo non viene creato
-        }
-
-        toast.success('Registrazione completata con successo!')
-        return { user: authData.user }
+      if (!authData.user) {
+        throw new Error('Registrazione fallita: utente non creato')
       }
+
+      // Se c'è una sessione, l'utente è già confermato
+      if (authData.session) {
+        console.log('✅ User registered and confirmed immediately')
+        
+        // Aspetta un momento per il trigger del database
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        // Verifica che il profilo sia stato creato dal trigger
+        const profile = await this.getProfile(authData.user.id)
+        
+        toast.success('Registrazione completata con successo!')
+        return { 
+          user: authData.user, 
+          profile,
+          needsConfirmation: false 
+        }
+      } else {
+        // L'utente deve confermare l'email
+        console.log('📨 User registered, email confirmation required')
+        toast.success('Registrazione completata! Controlla la tua email per confermare l\'account.')
+        return { 
+          user: authData.user, 
+          profile: null,
+          needsConfirmation: true 
+        }
+      }
+
     } catch (error) {
-      console.error('Registration error:', error)
+      console.error('💥 Registration error:', error)
       const message = this.getErrorMessage(error)
       toast.error(message)
       throw new Error(message)
@@ -84,24 +83,32 @@ const authService = {
   // Login utente
   login: async (email, password) => {
     try {
-      console.log('Attempting login with:', { email })
+      console.log('🔐 Attempting login...', { email })
       
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim().toLowerCase(),
         password,
       })
 
-      console.log('Login response:', { data, error })
+      console.log('🔑 Login response:', { 
+        user: data.user?.id, 
+        session: !!data.session,
+        error 
+      })
 
       if (error) throw error
 
-      // Ottieni o crea il profilo utente
-      let profile = await this.getOrCreateProfile(data.user)
+      if (!data.user) {
+        throw new Error('Login fallito')
+      }
+
+      // Ottieni il profilo utente
+      const profile = await this.getOrCreateProfile(data.user)
 
       toast.success('Login effettuato con successo!')
       return { user: data.user, profile }
     } catch (error) {
-      console.error('Login error:', error)
+      console.error('❌ Login error:', error)
       const message = this.getErrorMessage(error)
       toast.error(message)
       throw new Error(message)
@@ -115,6 +122,7 @@ const authService = {
       if (error) throw error
       toast.success('Logout effettuato con successo')
     } catch (error) {
+      console.error('Logout error:', error)
       toast.error('Errore durante il logout')
       throw error
     }
@@ -134,61 +142,55 @@ const authService = {
     }
   },
 
+  // Ottieni profilo esistente
+  getProfile: async (userId) => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching profile:', error)
+        return null
+      }
+
+      return profile
+    } catch (error) {
+      console.error('Error in getProfile:', error)
+      return null
+    }
+  },
+
   // Ottieni o crea profilo utente
   getOrCreateProfile: async (user) => {
     try {
-      console.log('Getting profile for user:', user.id)
+      console.log('👤 Getting/creating profile for user:', user.id)
       
-      let { data: profile, error } = await supabase
+      // Prima prova a ottenere il profilo esistente
+      let profile = await this.getProfile(user.id)
+      
+      if (profile) {
+        console.log('✅ Profile found:', profile.name)
+        return profile
+      }
+
+      console.log('🔨 Profile not found, creating new one...')
+      
+      // Se non esiste, crealo
+      const { data: newProfile, error: createError } = await supabase
         .from('profiles')
-        .select('*')
-        .eq('id', user.id)
+        .insert({
+          id: user.id,
+          name: user.user_metadata?.name || user.email.split('@')[0],
+          email: user.email,
+        })
+        .select()
         .single()
 
-      if (error && error.code === 'PGRST116') {
-        console.log('Profile not found, creating new one...')
-        
-        // Profilo non esiste, crealo con retry logic
-        let profileCreated = false
-        let attempts = 0
-        const maxAttempts = 3
-        
-        while (!profileCreated && attempts < maxAttempts) {
-          attempts++
-          console.log(`Profile creation attempt ${attempts}/${maxAttempts}`)
-          
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert({
-              id: user.id,
-              name: user.user_metadata?.name || user.email.split('@')[0],
-              email: user.email,
-            })
-            .select()
-            .single()
-
-          if (createError) {
-            console.warn(`Profile creation attempt ${attempts} failed:`, createError)
-            if (attempts < maxAttempts) {
-              await new Promise(resolve => setTimeout(resolve, 1000))
-            }
-          } else {
-            console.log('Profile created successfully:', newProfile)
-            profile = newProfile
-            profileCreated = true
-          }
-        }
-        
-        if (!profileCreated) {
-          console.warn('Profile creation failed after all attempts, using fallback')
-          return {
-            id: user.id,
-            name: user.user_metadata?.name || user.email.split('@')[0],
-            email: user.email
-          }
-        }
-      } else if (error) {
-        console.warn('Profile fetch error:', error)
+      if (createError) {
+        console.error('❌ Profile creation failed:', createError)
         // Ritorna un profilo di fallback
         return {
           id: user.id,
@@ -197,9 +199,11 @@ const authService = {
         }
       }
 
-      return profile
+      console.log('✅ Profile created successfully:', newProfile.name)
+      return newProfile
+
     } catch (error) {
-      console.error('Error with profile:', error)
+      console.error('💥 Error with profile:', error)
       return {
         id: user.id,
         name: user.user_metadata?.name || user.email.split('@')[0],
@@ -216,7 +220,10 @@ const authService = {
 
       const { data, error } = await supabase
         .from('profiles')
-        .update(profileData)
+        .update({
+          ...profileData,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', user.id)
         .select()
         .single()
@@ -233,8 +240,13 @@ const authService = {
 
   // Ottieni sessione corrente
   getSession: async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    return session
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      return session
+    } catch (error) {
+      console.error('Error getting session:', error)
+      return null
+    }
   },
 
   // Listener per cambiamenti di autenticazione
@@ -257,39 +269,52 @@ const authService = {
     }
   },
 
-  // Gestione errori
+  // Gestione errori migliorata
   getErrorMessage: (error) => {
-    console.log('Error details:', error)
+    console.log('🔍 Analyzing error:', error)
     
-    if (error.message?.includes('Invalid login credentials')) {
-      return 'Credenziali non valide'
+    const message = error.message || error.error_description || ''
+    
+    // Errori di autenticazione
+    if (message.includes('Invalid login credentials')) {
+      return 'Email o password non corretti'
     }
-    if (error.message?.includes('User already registered')) {
-      return 'Utente già registrato con questa email'
+    if (message.includes('Email not confirmed')) {
+      return 'Devi confermare la tua email prima di accedere'
     }
-    if (error.message?.includes('Password should be at least 6 characters')) {
-      return 'La password deve essere di almeno 6 caratteri'
+    if (message.includes('User already registered')) {
+      return 'Esiste già un account con questa email'
     }
-    if (error.message?.includes('Unable to validate email address')) {
-      return 'Indirizzo email non valido'
-    }
-    if (error.message?.includes('Email not confirmed')) {
-      return 'Email non confermata. Controlla la tua casella di posta.'
-    }
-    if (error.message?.includes('Signup is disabled')) {
+    if (message.includes('Signup is disabled')) {
       return 'La registrazione è temporaneamente disabilitata'
     }
-    if (error.message?.includes('Invalid email')) {
+    
+    // Errori di validazione
+    if (message.includes('Password should be at least 6 characters')) {
+      return 'La password deve essere di almeno 6 caratteri'
+    }
+    if (message.includes('Unable to validate email address') || message.includes('Invalid email')) {
       return 'Formato email non valido'
     }
-    if (error.message?.includes('Weak password')) {
-      return 'Password troppo debole. Usa almeno 6 caratteri.'
-    }
-    if (error.message?.includes('new row violates row-level security policy')) {
-      return 'Errore di sicurezza durante la registrazione. Riprova tra qualche secondo.'
+    if (message.includes('Weak password')) {
+      return 'Password troppo debole. Usa almeno 6 caratteri con lettere e numeri.'
     }
     
-    return error.message || 'Errore sconosciuto'
+    // Errori di database/RLS
+    if (message.includes('new row violates row-level security policy')) {
+      return 'Errore di sicurezza. Riprova tra qualche secondo.'
+    }
+    if (message.includes('JWT expired')) {
+      return 'Sessione scaduta. Effettua nuovamente il login.'
+    }
+    
+    // Errori di rete
+    if (message.includes('Failed to fetch') || message.includes('Network error')) {
+      return 'Errore di connessione. Controlla la tua connessione internet.'
+    }
+    
+    // Errore generico
+    return message || 'Si è verificato un errore imprevisto'
   }
 }
 
