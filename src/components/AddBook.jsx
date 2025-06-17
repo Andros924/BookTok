@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, BookOpen, Plus, ArrowLeft, Loader } from 'lucide-react';
+import { Search, BookOpen, Plus, ArrowLeft, Loader, AlertCircle } from 'lucide-react';
 import bookService from '../services/bookService';
 
 function AddBook() {
@@ -10,6 +10,7 @@ function AddBook() {
   const [selectedBook, setSelectedBook] = useState(null);
   const [loading, setLoading] = useState(false);
   const [manualEntry, setManualEntry] = useState(false);
+  const [searchError, setSearchError] = useState('');
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -25,24 +26,43 @@ function AddBook() {
     genre: '',
     personal_notes: '',
     rating: '',
-    read_status: 'to_read'
+    read_status: 'to_read',
+    location: 'Libreria',
+    purchase_price: '',
+    purchase_date: '',
+    is_favorite: false
   });
 
   const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
+    if (!searchQuery.trim()) {
+      setSearchError('Inserisci un termine di ricerca');
+      return;
+    }
 
     setLoading(true);
+    setSearchError('');
+    setSearchResults([]);
+
     try {
       let results;
       if (searchType === 'isbn') {
-        const result = await bookService.searchByISBN(searchQuery);
+        const result = await bookService.searchByISBN(searchQuery.trim());
         results = [result];
       } else {
-        results = await bookService.searchByTitle(searchQuery);
+        results = await bookService.searchByTitle(searchQuery.trim());
       }
-      setSearchResults(results);
+      
+      if (results && results.length > 0) {
+        setSearchResults(results);
+        setSearchError('');
+      } else {
+        setSearchResults([]);
+        setSearchError('Nessun libro trovato');
+      }
     } catch (error) {
+      console.error('Search error:', error);
       setSearchResults([]);
+      setSearchError(error.message || 'Errore durante la ricerca');
     } finally {
       setLoading(false);
     }
@@ -55,30 +75,120 @@ function AddBook() {
       ...book,
       personal_notes: '',
       rating: '',
-      read_status: 'to_read'
+      read_status: 'to_read',
+      location: 'Libreria',
+      purchase_price: '',
+      purchase_date: '',
+      is_favorite: false
     });
   };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }));
+  };
+
+  const validateForm = () => {
+    const errors = [];
+    
+    if (!formData.title.trim()) {
+      errors.push('Il titolo è obbligatorio');
+    }
+    
+    if (!formData.author.trim()) {
+      errors.push('L\'autore è obbligatorio');
+    }
+    
+    if (formData.rating && (parseInt(formData.rating) < 1 || parseInt(formData.rating) > 5)) {
+      errors.push('La valutazione deve essere tra 1 e 5');
+    }
+    
+    if (formData.year && (parseInt(formData.year) < 1000 || parseInt(formData.year) > new Date().getFullYear() + 1)) {
+      errors.push('Anno non valido');
+    }
+    
+    if (formData.pages && parseInt(formData.pages) < 0) {
+      errors.push('Il numero di pagine non può essere negativo');
+    }
+    
+    if (formData.purchase_price && parseFloat(formData.purchase_price) < 0) {
+      errors.push('Il prezzo non può essere negativo');
+    }
+    
+    return errors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
+      alert(validationErrors.join('\n'));
+      return;
+    }
+    
     setLoading(true);
 
     try {
-      await bookService.addBook(formData);
+      // Prepara i dati per l'invio
+      const bookData = {
+        ...formData,
+        title: formData.title.trim(),
+        author: formData.author.trim(),
+        isbn: formData.isbn.trim() || null,
+        year: formData.year ? parseInt(formData.year) : null,
+        pages: formData.pages ? parseInt(formData.pages) : null,
+        rating: formData.rating ? parseInt(formData.rating) : null,
+        purchase_price: formData.purchase_price ? parseFloat(formData.purchase_price) : null,
+        description: formData.description.trim() || null,
+        cover_image: formData.cover_image.trim() || null,
+        publisher: formData.publisher.trim() || null,
+        genre: formData.genre.trim() || null,
+        personal_notes: formData.personal_notes.trim() || null,
+        location: formData.location.trim() || 'Libreria',
+        language: formData.language || 'Italiano'
+      };
+
+      console.log('📚 Submitting book data:', bookData);
+      
+      await bookService.addBook(bookData);
       navigate('/books');
     } catch (error) {
-      // Error handled in service
+      console.error('❌ Submit error:', error);
+      // L'errore è già gestito nel service con toast
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      author: '',
+      isbn: '',
+      year: '',
+      description: '',
+      cover_image: '',
+      pages: '',
+      language: 'Italiano',
+      publisher: '',
+      genre: '',
+      personal_notes: '',
+      rating: '',
+      read_status: 'to_read',
+      location: 'Libreria',
+      purchase_price: '',
+      purchase_date: '',
+      is_favorite: false
+    });
+    setSelectedBook(null);
+    setManualEntry(false);
+    setSearchResults([]);
+    setSearchError('');
+    setSearchQuery('');
   };
 
   return (
@@ -143,6 +253,15 @@ function AddBook() {
               </button>
             </div>
 
+            {/* Errore di ricerca */}
+            {searchError && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                <span className="text-red-700 text-sm">{searchError}</span>
+              </div>
+            )}
+
+            {/* Risultati della ricerca */}
             {searchResults.length > 0 && (
               <div className="mt-6">
                 <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-4">Risultati della ricerca</h3>
@@ -159,12 +278,15 @@ function AddBook() {
                             src={book.cover_image}
                             alt={book.title}
                             className="w-12 h-16 sm:w-16 sm:h-20 object-cover rounded flex-shrink-0"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.nextSibling.style.display = 'flex';
+                            }}
                           />
-                        ) : (
-                          <div className="w-12 h-16 sm:w-16 sm:h-20 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
-                            <BookOpen className="h-6 w-6 text-gray-400" />
-                          </div>
-                        )}
+                        ) : null}
+                        <div className="w-12 h-16 sm:w-16 sm:h-20 bg-gray-200 rounded flex items-center justify-center flex-shrink-0" style={{display: book.cover_image ? 'none' : 'flex'}}>
+                          <BookOpen className="h-6 w-6 text-gray-400" />
+                        </div>
                         <div className="flex-1 min-w-0">
                           <h4 className="font-semibold text-gray-900 text-sm sm:text-base line-clamp-2">{book.title}</h4>
                           <p className="text-gray-600 text-sm mt-1">{book.author}</p>
@@ -190,14 +312,24 @@ function AddBook() {
               <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
                 {selectedBook ? 'Conferma Dettagli Libro' : 'Inserimento Manuale'}
               </h2>
-              {!selectedBook && (
-                <button
-                  onClick={() => setManualEntry(false)}
-                  className="text-gray-500 hover:text-gray-700 text-sm"
-                >
-                  Torna alla ricerca
-                </button>
-              )}
+              <div className="flex gap-2">
+                {selectedBook && (
+                  <button
+                    onClick={resetForm}
+                    className="text-gray-500 hover:text-gray-700 text-sm px-3 py-1 border border-gray-300 rounded"
+                  >
+                    Nuova ricerca
+                  </button>
+                )}
+                {!selectedBook && (
+                  <button
+                    onClick={() => setManualEntry(false)}
+                    className="text-gray-500 hover:text-gray-700 text-sm px-3 py-1 border border-gray-300 rounded"
+                  >
+                    Torna alla ricerca
+                  </button>
+                )}
+              </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
@@ -250,6 +382,8 @@ function AddBook() {
                   <input
                     type="number"
                     name="year"
+                    min="1000"
+                    max={new Date().getFullYear() + 1}
                     value={formData.year}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
@@ -276,6 +410,7 @@ function AddBook() {
                   <input
                     type="number"
                     name="pages"
+                    min="0"
                     value={formData.pages}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
@@ -327,6 +462,7 @@ function AddBook() {
                     <option value="to_read">Da Leggere</option>
                     <option value="reading">In Lettura</option>
                     <option value="read">Letto</option>
+                    <option value="abandoned">Abbandonato</option>
                   </select>
                 </div>
 
@@ -347,6 +483,35 @@ function AddBook() {
                     <option value="4">4 stelle</option>
                     <option value="5">5 stelle</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Posizione
+                  </label>
+                  <input
+                    type="text"
+                    name="location"
+                    value={formData.location}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
+                    placeholder="Libreria, Camera, ecc."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Prezzo di acquisto (€)
+                  </label>
+                  <input
+                    type="number"
+                    name="purchase_price"
+                    min="0"
+                    step="0.01"
+                    value={formData.purchase_price}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
+                  />
                 </div>
               </div>
 
@@ -388,6 +553,20 @@ function AddBook() {
                   placeholder="Aggiungi le tue note personali su questo libro..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
                 />
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  name="is_favorite"
+                  id="is_favorite"
+                  checked={formData.is_favorite}
+                  onChange={handleInputChange}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <label htmlFor="is_favorite" className="ml-2 block text-sm text-gray-900">
+                  Aggiungi ai preferiti
+                </label>
               </div>
 
               <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 pt-4">

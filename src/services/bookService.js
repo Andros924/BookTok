@@ -68,34 +68,81 @@ const bookService = {
     }
   },
 
-  // Aggiungi nuovo libro
+  // Aggiungi nuovo libro - VERSIONE CORRETTA
   addBook: async (bookData) => {
     try {
+      console.log('📚 Adding book with data:', bookData)
+      
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Utente non autenticato')
 
-      // Prepara i dati del libro
+      // Validazione dati obbligatori
+      if (!bookData.title || !bookData.author) {
+        throw new Error('Titolo e autore sono obbligatori')
+      }
+
+      // Prepara i dati del libro con validazione e pulizia
       const bookToInsert = {
-        ...bookData,
         user_id: user.id,
+        title: String(bookData.title).trim(),
+        author: String(bookData.author).trim(),
+        
+        // Campi opzionali con validazione
+        isbn: bookData.isbn ? String(bookData.isbn).trim() : null,
+        isbn13: bookData.isbn13 ? String(bookData.isbn13).trim() : null,
+        description: bookData.description ? String(bookData.description).trim() : null,
+        cover_image: bookData.cover_image ? String(bookData.cover_image).trim() : null,
+        publisher: bookData.publisher ? String(bookData.publisher).trim() : null,
+        genre: bookData.genre ? String(bookData.genre).trim() : null,
+        personal_notes: bookData.personal_notes ? String(bookData.personal_notes).trim() : null,
+        location: bookData.location ? String(bookData.location).trim() : 'Libreria',
+        language: bookData.language ? String(bookData.language).trim() : 'Italiano',
+        
+        // Campi numerici con validazione
+        year: bookData.year ? parseInt(bookData.year) : null,
+        pages: bookData.pages ? parseInt(bookData.pages) : 0,
+        rating: bookData.rating ? parseInt(bookData.rating) : null,
+        purchase_price: bookData.purchase_price ? parseFloat(bookData.purchase_price) : null,
+        
+        // Campi booleani
+        is_favorite: bookData.is_favorite ? Boolean(bookData.is_favorite) : false,
+        
+        // Stato di lettura
+        read_status: bookData.read_status || 'to_read',
+        
+        // Date
+        date_started: bookData.date_started || null,
+        date_finished: bookData.date_finished || null,
+        purchase_date: bookData.purchase_date || null,
+        
+        // Array di tags
+        tags: bookData.tags && Array.isArray(bookData.tags) ? bookData.tags : null,
+        
+        // Timestamp automatici
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
 
-      // Converti rating in numero se presente
-      if (bookToInsert.rating) {
-        bookToInsert.rating = parseInt(bookToInsert.rating)
+      // Validazioni aggiuntive
+      if (bookToInsert.rating && (bookToInsert.rating < 1 || bookToInsert.rating > 5)) {
+        throw new Error('La valutazione deve essere tra 1 e 5')
       }
 
-      // Converti year in numero se presente
-      if (bookToInsert.year) {
-        bookToInsert.year = parseInt(bookToInsert.year)
+      if (bookToInsert.year && (bookToInsert.year < 1000 || bookToInsert.year > new Date().getFullYear() + 1)) {
+        throw new Error('Anno non valido')
       }
 
-      // Converti pages in numero se presente
-      if (bookToInsert.pages) {
-        bookToInsert.pages = parseInt(bookToInsert.pages)
+      if (bookToInsert.pages && bookToInsert.pages < 0) {
+        bookToInsert.pages = 0
       }
+
+      // Valida read_status
+      const validStatuses = ['to_read', 'reading', 'read', 'abandoned']
+      if (!validStatuses.includes(bookToInsert.read_status)) {
+        bookToInsert.read_status = 'to_read'
+      }
+
+      console.log('✅ Validated book data:', bookToInsert)
 
       const { data, error } = await supabase
         .from('books')
@@ -103,38 +150,121 @@ const bookService = {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Database insert error:', error)
+        throw error
+      }
+
+      console.log('✅ Book added successfully:', data.id)
       toast.success('Libro aggiunto con successo!')
       return data
     } catch (error) {
-      const message = error.message || 'Errore nell\'aggiunta del libro'
+      console.error('💥 Add book error:', error)
+      const message = bookService.getBookErrorMessage(error)
       toast.error(message)
       throw new Error(message)
     }
   },
 
-  // Aggiorna libro esistente
+  // Aggiorna libro esistente - VERSIONE CORRETTA
   updateBook: async (bookId, bookData) => {
     try {
+      console.log('📝 Updating book:', bookId, bookData)
+      
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Utente non autenticato')
 
-      // Prepara i dati per l'aggiornamento
+      // Prepara i dati per l'aggiornamento con validazione
       const updateData = {
-        ...bookData,
         updated_at: new Date().toISOString()
       }
 
-      // Converti campi numerici
-      if (updateData.rating) {
-        updateData.rating = parseInt(updateData.rating)
+      // Aggiorna solo i campi forniti
+      if (bookData.title !== undefined) {
+        updateData.title = String(bookData.title).trim()
       }
-      if (updateData.year) {
-        updateData.year = parseInt(updateData.year)
+      if (bookData.author !== undefined) {
+        updateData.author = String(bookData.author).trim()
       }
-      if (updateData.pages) {
-        updateData.pages = parseInt(updateData.pages)
+      if (bookData.isbn !== undefined) {
+        updateData.isbn = bookData.isbn ? String(bookData.isbn).trim() : null
       }
+      if (bookData.isbn13 !== undefined) {
+        updateData.isbn13 = bookData.isbn13 ? String(bookData.isbn13).trim() : null
+      }
+      if (bookData.description !== undefined) {
+        updateData.description = bookData.description ? String(bookData.description).trim() : null
+      }
+      if (bookData.cover_image !== undefined) {
+        updateData.cover_image = bookData.cover_image ? String(bookData.cover_image).trim() : null
+      }
+      if (bookData.publisher !== undefined) {
+        updateData.publisher = bookData.publisher ? String(bookData.publisher).trim() : null
+      }
+      if (bookData.genre !== undefined) {
+        updateData.genre = bookData.genre ? String(bookData.genre).trim() : null
+      }
+      if (bookData.personal_notes !== undefined) {
+        updateData.personal_notes = bookData.personal_notes ? String(bookData.personal_notes).trim() : null
+      }
+      if (bookData.location !== undefined) {
+        updateData.location = bookData.location ? String(bookData.location).trim() : 'Libreria'
+      }
+      if (bookData.language !== undefined) {
+        updateData.language = bookData.language ? String(bookData.language).trim() : 'Italiano'
+      }
+
+      // Campi numerici
+      if (bookData.year !== undefined) {
+        updateData.year = bookData.year ? parseInt(bookData.year) : null
+      }
+      if (bookData.pages !== undefined) {
+        updateData.pages = bookData.pages ? parseInt(bookData.pages) : 0
+      }
+      if (bookData.rating !== undefined) {
+        updateData.rating = bookData.rating ? parseInt(bookData.rating) : null
+      }
+      if (bookData.purchase_price !== undefined) {
+        updateData.purchase_price = bookData.purchase_price ? parseFloat(bookData.purchase_price) : null
+      }
+
+      // Campi booleani
+      if (bookData.is_favorite !== undefined) {
+        updateData.is_favorite = Boolean(bookData.is_favorite)
+      }
+
+      // Stato di lettura
+      if (bookData.read_status !== undefined) {
+        const validStatuses = ['to_read', 'reading', 'read', 'abandoned']
+        updateData.read_status = validStatuses.includes(bookData.read_status) ? bookData.read_status : 'to_read'
+      }
+
+      // Date
+      if (bookData.date_started !== undefined) {
+        updateData.date_started = bookData.date_started
+      }
+      if (bookData.date_finished !== undefined) {
+        updateData.date_finished = bookData.date_finished
+      }
+      if (bookData.purchase_date !== undefined) {
+        updateData.purchase_date = bookData.purchase_date
+      }
+
+      // Tags
+      if (bookData.tags !== undefined) {
+        updateData.tags = bookData.tags && Array.isArray(bookData.tags) ? bookData.tags : null
+      }
+
+      // Validazioni
+      if (updateData.rating && (updateData.rating < 1 || updateData.rating > 5)) {
+        throw new Error('La valutazione deve essere tra 1 e 5')
+      }
+
+      if (updateData.year && (updateData.year < 1000 || updateData.year > new Date().getFullYear() + 1)) {
+        throw new Error('Anno non valido')
+      }
+
+      console.log('✅ Validated update data:', updateData)
 
       const { data, error } = await supabase
         .from('books')
@@ -144,11 +274,17 @@ const bookService = {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Database update error:', error)
+        throw error
+      }
+
+      console.log('✅ Book updated successfully')
       toast.success('Libro aggiornato con successo!')
       return data
     } catch (error) {
-      const message = error.message || 'Errore nell\'aggiornamento del libro'
+      console.error('💥 Update book error:', error)
+      const message = bookService.getBookErrorMessage(error)
       toast.error(message)
       throw new Error(message)
     }
@@ -648,6 +784,34 @@ const bookService = {
       console.error('Error getting books by genre:', error)
       return []
     }
+  },
+
+  // Gestione errori specifici per i libri
+  getBookErrorMessage: (error) => {
+    const message = error.message || ''
+    
+    if (message.includes('duplicate key value violates unique constraint')) {
+      return 'Questo libro è già presente nella tua libreria'
+    }
+    if (message.includes('violates check constraint "books_rating_check"')) {
+      return 'La valutazione deve essere tra 1 e 5'
+    }
+    if (message.includes('violates check constraint "books_read_status_check"')) {
+      return 'Stato di lettura non valido'
+    }
+    if (message.includes('violates not-null constraint')) {
+      if (message.includes('title')) return 'Il titolo è obbligatorio'
+      if (message.includes('author')) return 'L\'autore è obbligatorio'
+      if (message.includes('user_id')) return 'Errore di autenticazione'
+    }
+    if (message.includes('violates foreign key constraint')) {
+      return 'Errore di riferimento nel database'
+    }
+    if (message.includes('new row violates row-level security policy')) {
+      return 'Non hai i permessi per questa operazione'
+    }
+    
+    return message || 'Errore sconosciuto'
   }
 }
 
