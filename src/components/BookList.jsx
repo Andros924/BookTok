@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Search, Filter, Star, Eye, Clock, CheckCircle, Grid, List } from 'lucide-react';
+import { BookOpen, Search, Filter, Star, Eye, Clock, CheckCircle, Grid, List, Heart, BookMarked } from 'lucide-react';
 import bookService from '../services/bookService';
 
 function BookList() {
@@ -11,6 +11,7 @@ function BookList() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('created_at');
   const [viewMode, setViewMode] = useState('grid');
+  const [updatingBook, setUpdatingBook] = useState(null);
 
   useEffect(() => {
     const fetchBooks = async () => {
@@ -64,12 +65,73 @@ function BookList() {
     setFilteredBooks(filtered);
   }, [books, searchTerm, statusFilter, sortBy]);
 
+  const handleQuickStatusChange = async (bookId, newStatus, event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    if (updatingBook === bookId) return;
+    
+    setUpdatingBook(bookId);
+    try {
+      const additionalData = {};
+      
+      // Aggiungi date automatiche
+      const book = books.find(b => b.id === bookId);
+      if (newStatus === 'reading' && book.read_status !== 'reading') {
+        additionalData.date_started = new Date().toISOString();
+      }
+      if (newStatus === 'read' && book.read_status !== 'read') {
+        additionalData.date_finished = new Date().toISOString();
+      }
+      
+      const updatedBook = await bookService.updateReadingStatus(bookId, newStatus, additionalData);
+      
+      // Aggiorna lo stato locale
+      setBooks(prevBooks => 
+        prevBooks.map(book => 
+          book.id === bookId ? updatedBook : book
+        )
+      );
+      
+    } catch (error) {
+      console.error('❌ Error updating status:', error);
+    } finally {
+      setUpdatingBook(null);
+    }
+  };
+
+  const handleToggleFavorite = async (bookId, event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    if (updatingBook === bookId) return;
+    
+    setUpdatingBook(bookId);
+    try {
+      const updatedBook = await bookService.toggleFavorite(bookId);
+      
+      // Aggiorna lo stato locale
+      setBooks(prevBooks => 
+        prevBooks.map(book => 
+          book.id === bookId ? updatedBook : book
+        )
+      );
+      
+    } catch (error) {
+      console.error('❌ Error toggling favorite:', error);
+    } finally {
+      setUpdatingBook(null);
+    }
+  };
+
   const getStatusIcon = (status) => {
     switch (status) {
       case 'read':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'reading':
         return <Eye className="h-4 w-4 text-yellow-500" />;
+      case 'abandoned':
+        return <BookMarked className="h-4 w-4 text-red-500" />;
       default:
         return <Clock className="h-4 w-4 text-gray-500" />;
     }
@@ -81,8 +143,23 @@ function BookList() {
         return 'Letto';
       case 'reading':
         return 'In lettura';
+      case 'abandoned':
+        return 'Abbandonato';
       default:
         return 'Da leggere';
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'read':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'reading':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'abandoned':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -98,6 +175,56 @@ function BookList() {
             }`}
           />
         ))}
+      </div>
+    );
+  };
+
+  const StatusDropdown = ({ book, onStatusChange }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    
+    const statuses = [
+      { value: 'to_read', label: 'Da leggere', icon: Clock },
+      { value: 'reading', label: 'In lettura', icon: Eye },
+      { value: 'read', label: 'Letto', icon: CheckCircle },
+      { value: 'abandoned', label: 'Abbandonato', icon: BookMarked }
+    ];
+
+    return (
+      <div className="relative">
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsOpen(!isOpen);
+          }}
+          disabled={updatingBook === book.id}
+          className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-colors ${getStatusColor(book.read_status)} ${
+            updatingBook === book.id ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'
+          }`}
+        >
+          {getStatusIcon(book.read_status)}
+          <span className="hidden sm:inline">{getStatusText(book.read_status)}</span>
+        </button>
+        
+        {isOpen && (
+          <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-32">
+            {statuses.map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                onClick={(e) => {
+                  onStatusChange(book.id, value, e);
+                  setIsOpen(false);
+                }}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
+                  book.read_status === value ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
@@ -158,6 +285,7 @@ function BookList() {
                 <option value="to_read">Da leggere</option>
                 <option value="reading">In lettura</option>
                 <option value="read">Letti</option>
+                <option value="abandoned">Abbandonati</option>
               </select>
 
               <select
@@ -233,20 +361,33 @@ function BookList() {
               <Link
                 key={book.id}
                 to={`/books/${book.id}`}
-                className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all duration-200 transform hover:scale-105"
+                className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all duration-200 transform hover:scale-105 relative group"
               >
+                {/* Favorite Heart */}
+                {book.is_favorite && (
+                  <div className="absolute top-2 right-2 z-10">
+                    <Heart className="h-5 w-5 text-red-500 fill-current" />
+                  </div>
+                )}
+
                 <div className="aspect-w-3 aspect-h-4">
                   {book.cover_image ? (
                     <img
                       src={book.cover_image}
                       alt={book.title}
                       className="w-full h-32 sm:h-40 lg:h-48 object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
                     />
-                  ) : (
-                    <div className="w-full h-32 sm:h-40 lg:h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                      <BookOpen className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 text-gray-400" />
-                    </div>
-                  )}
+                  ) : null}
+                  <div 
+                    className="w-full h-32 sm:h-40 lg:h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center"
+                    style={{display: book.cover_image ? 'none' : 'flex'}}
+                  >
+                    <BookOpen className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 text-gray-400" />
+                  </div>
                 </div>
                 
                 <div className="p-2 sm:p-3 lg:p-4">
@@ -261,16 +402,26 @@ function BookList() {
                   </div>
                   
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1">
-                      {getStatusIcon(book.read_status)}
-                      <span className="text-xs text-gray-600 hidden sm:inline">
-                        {getStatusText(book.read_status)}
-                      </span>
-                    </div>
+                    <StatusDropdown book={book} onStatusChange={handleQuickStatusChange} />
                     
                     {book.pages && (
                       <span className="text-xs text-gray-500">{book.pages} pp.</span>
                     )}
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div className="mt-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => handleToggleFavorite(book.id, e)}
+                      disabled={updatingBook === book.id}
+                      className={`flex-1 px-2 py-1 rounded text-xs transition-colors ${
+                        book.is_favorite
+                          ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      } ${updatingBook === book.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <Heart className={`h-3 w-3 mx-auto ${book.is_favorite ? 'fill-current' : ''}`} />
+                    </button>
                   </div>
                 </div>
               </Link>
@@ -291,33 +442,58 @@ function BookList() {
                         src={book.cover_image}
                         alt={book.title}
                         className="w-12 h-16 sm:w-16 sm:h-20 object-cover rounded flex-shrink-0"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }}
                       />
-                    ) : (
-                      <div className="w-12 h-16 sm:w-16 sm:h-20 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
-                        <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
-                      </div>
-                    )}
+                    ) : null}
+                    <div 
+                      className="w-12 h-16 sm:w-16 sm:h-20 bg-gray-200 rounded flex items-center justify-center flex-shrink-0"
+                      style={{display: book.cover_image ? 'none' : 'flex'}}
+                    >
+                      <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
+                    </div>
                     
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 text-sm sm:text-base line-clamp-1">
-                        {book.title}
-                      </h3>
-                      <p className="text-gray-600 text-xs sm:text-sm mt-1">{book.author}</p>
-                      
-                      <div className="flex items-center gap-4 mt-2 text-xs sm:text-sm text-gray-500">
-                        <span>{book.year}</span>
-                        {book.pages && <span>{book.pages} pp.</span>}
-                        <div className="flex items-center gap-1">
-                          {getStatusIcon(book.read_status)}
-                          <span>{getStatusText(book.read_status)}</span>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-gray-900 text-sm sm:text-base line-clamp-1 flex items-center gap-2">
+                            {book.title}
+                            {book.is_favorite && (
+                              <Heart className="h-4 w-4 text-red-500 fill-current flex-shrink-0" />
+                            )}
+                          </h3>
+                          <p className="text-gray-600 text-xs sm:text-sm mt-1">{book.author}</p>
+                          
+                          <div className="flex items-center gap-4 mt-2 text-xs sm:text-sm text-gray-500">
+                            <span>{book.year}</span>
+                            {book.pages && <span>{book.pages} pp.</span>
+                          </div>
+                          
+                          {book.rating && (
+                            <div className="mt-2">
+                              {renderStars(book.rating)}
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex flex-col items-end gap-2 ml-4">
+                          <StatusDropdown book={book} onStatusChange={handleQuickStatusChange} />
+                          
+                          <button
+                            onClick={(e) => handleToggleFavorite(book.id, e)}
+                            disabled={updatingBook === book.id}
+                            className={`p-1 rounded transition-colors ${
+                              book.is_favorite
+                                ? 'text-red-500 hover:bg-red-50'
+                                : 'text-gray-400 hover:bg-gray-100'
+                            } ${updatingBook === book.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            <Heart className={`h-4 w-4 ${book.is_favorite ? 'fill-current' : ''}`} />
+                          </button>
                         </div>
                       </div>
-                      
-                      {book.rating && (
-                        <div className="mt-2">
-                          {renderStars(book.rating)}
-                        </div>
-                      )}
                     </div>
                   </div>
                 </Link>
