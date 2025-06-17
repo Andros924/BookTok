@@ -26,25 +26,48 @@ const authService = {
       }
 
       if (authData.user) {
-        // Aspetta un momento prima di creare il profilo
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        // Aspetta che l'utente sia completamente autenticato
+        await new Promise(resolve => setTimeout(resolve, 2000))
         
         try {
-          // Crea il profilo utente
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert({
-              id: authData.user.id,
-              name: userData.name,
-              email: userData.email,
-            })
+          console.log('Creating profile for user:', authData.user.id)
+          
+          // Crea il profilo utente con retry logic
+          let profileCreated = false
+          let attempts = 0
+          const maxAttempts = 3
+          
+          while (!profileCreated && attempts < maxAttempts) {
+            attempts++
+            console.log(`Profile creation attempt ${attempts}/${maxAttempts}`)
+            
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .insert({
+                id: authData.user.id,
+                name: userData.name,
+                email: userData.email,
+              })
+              .select()
+              .single()
 
-          if (profileError) {
-            console.warn('Profile creation error:', profileError)
-            // Non bloccare la registrazione se il profilo non viene creato
+            if (profileError) {
+              console.warn(`Profile creation attempt ${attempts} failed:`, profileError)
+              if (attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 1000))
+              }
+            } else {
+              console.log('Profile created successfully:', profileData)
+              profileCreated = true
+            }
+          }
+          
+          if (!profileCreated) {
+            console.warn('Profile creation failed after all attempts, but registration succeeded')
           }
         } catch (profileErr) {
           console.warn('Profile creation failed:', profileErr)
+          // Non bloccare la registrazione se il profilo non viene creato
         }
 
         toast.success('Registrazione completata con successo!')
@@ -114,6 +137,8 @@ const authService = {
   // Ottieni o crea profilo utente
   getOrCreateProfile: async (user) => {
     try {
+      console.log('Getting profile for user:', user.id)
+      
       let { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
@@ -121,27 +146,47 @@ const authService = {
         .single()
 
       if (error && error.code === 'PGRST116') {
-        // Profilo non esiste, crealo
-        const { data: newProfile, error: createError } = await supabase
-          .from('profiles')
-          .insert({
-            id: user.id,
-            name: user.user_metadata?.name || user.email.split('@')[0],
-            email: user.email,
-          })
-          .select()
-          .single()
+        console.log('Profile not found, creating new one...')
+        
+        // Profilo non esiste, crealo con retry logic
+        let profileCreated = false
+        let attempts = 0
+        const maxAttempts = 3
+        
+        while (!profileCreated && attempts < maxAttempts) {
+          attempts++
+          console.log(`Profile creation attempt ${attempts}/${maxAttempts}`)
+          
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              name: user.user_metadata?.name || user.email.split('@')[0],
+              email: user.email,
+            })
+            .select()
+            .single()
 
-        if (createError) {
-          console.warn('Profile creation error:', createError)
-          // Ritorna un profilo di fallback
+          if (createError) {
+            console.warn(`Profile creation attempt ${attempts} failed:`, createError)
+            if (attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 1000))
+            }
+          } else {
+            console.log('Profile created successfully:', newProfile)
+            profile = newProfile
+            profileCreated = true
+          }
+        }
+        
+        if (!profileCreated) {
+          console.warn('Profile creation failed after all attempts, using fallback')
           return {
             id: user.id,
             name: user.user_metadata?.name || user.email.split('@')[0],
             email: user.email
           }
         }
-        profile = newProfile
       } else if (error) {
         console.warn('Profile fetch error:', error)
         // Ritorna un profilo di fallback
@@ -239,6 +284,9 @@ const authService = {
     }
     if (error.message?.includes('Weak password')) {
       return 'Password troppo debole. Usa almeno 6 caratteri.'
+    }
+    if (error.message?.includes('new row violates row-level security policy')) {
+      return 'Errore di sicurezza durante la registrazione. Riprova tra qualche secondo.'
     }
     
     return error.message || 'Errore sconosciuto'
