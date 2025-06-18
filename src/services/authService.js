@@ -19,14 +19,15 @@ const authService = {
         throw new Error('La password deve essere di almeno 6 caratteri')
       }
 
-      // Registrazione utente
+      // Registrazione utente con email confirmation disabilitata
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: userData.email.trim().toLowerCase(),
         password: userData.password,
         options: {
           data: {
             name: userData.name.trim()
-          }
+          },
+          emailRedirectTo: undefined // Disabilita redirect email
         }
       })
 
@@ -45,9 +46,9 @@ const authService = {
         throw new Error('Registrazione fallita: utente non creato')
       }
 
-      // Se c'è una sessione, l'utente è già confermato
+      // Con email confirmation disabilitata, dovremmo sempre avere una sessione
       if (authData.session) {
-        console.log('✅ User registered and confirmed immediately')
+        console.log('✅ User registered and logged in immediately')
         
         // Aspetta un momento per il trigger del database
         await new Promise(resolve => setTimeout(resolve, 2000))
@@ -62,9 +63,9 @@ const authService = {
           needsConfirmation: false 
         }
       } else {
-        // L'utente deve confermare l'email
-        console.log('📨 User registered, email confirmation required')
-        toast.success('Registrazione completata! Controlla la tua email per confermare l\'account.')
+        // Questo caso non dovrebbe verificarsi con email confirmation disabilitata
+        console.log('⚠️ No session created - this should not happen')
+        toast.success('Registrazione completata! Effettua il login.')
         return { 
           user: authData.user, 
           profile: null,

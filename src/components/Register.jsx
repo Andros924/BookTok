@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BookOpen, User, Mail, Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
+import { BookOpen, User, Mail, Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import authService from '../services/authService';
 
 function Register({ setIsAuthenticated, setUser, setProfile }) {
@@ -13,7 +13,7 @@ function Register({ setIsAuthenticated, setUser, setProfile }) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [registrationStep, setRegistrationStep] = useState('form'); // 'form', 'success', 'confirm'
+  const [registrationStep, setRegistrationStep] = useState('form'); // 'form', 'success'
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -74,20 +74,21 @@ function Register({ setIsAuthenticated, setUser, setProfile }) {
       
       console.log('✅ Registration result:', result);
       
-      if (result.needsConfirmation) {
-        // L'utente deve confermare l'email
-        setRegistrationStep('confirm');
-      } else {
-        // L'utente è già confermato, procedi con il login
+      // Con email confirmation disabilitata, dovremmo sempre essere loggati
+      if (!result.needsConfirmation) {
         setIsAuthenticated(true);
         setUser(result.user);
         setProfile(result.profile);
         setRegistrationStep('success');
         
-        // Reindirizza dopo un breve delay
+        // Reindirizza immediatamente alla dashboard
         setTimeout(() => {
           navigate('/dashboard');
-        }, 2000);
+        }, 1500);
+      } else {
+        // Questo caso non dovrebbe verificarsi con email confirmation disabilitata
+        console.log('⚠️ Unexpected: email confirmation required');
+        navigate('/login');
       }
       
     } catch (error) {
@@ -97,38 +98,6 @@ function Register({ setIsAuthenticated, setUser, setProfile }) {
       setLoading(false);
     }
   };
-
-  // Schermata di conferma email
-  if (registrationStep === 'confirm') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8">
-          <div className="text-center">
-            <div className="flex justify-center">
-              <Mail className="h-12 w-12 text-indigo-600" />
-            </div>
-            <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-              Controlla la tua email
-            </h2>
-            <p className="mt-2 text-sm text-gray-600">
-              Ti abbiamo inviato un link di conferma all'indirizzo <strong>{formData.email}</strong>
-            </p>
-            <p className="mt-4 text-sm text-gray-500">
-              Clicca sul link nell'email per attivare il tuo account, poi torna qui per effettuare il login.
-            </p>
-            <div className="mt-6">
-              <Link
-                to="/login"
-                className="text-indigo-600 hover:text-indigo-500 font-medium"
-              >
-                Vai al login
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Schermata di successo
   if (registrationStep === 'success') {
@@ -140,7 +109,7 @@ function Register({ setIsAuthenticated, setUser, setProfile }) {
               <CheckCircle className="h-12 w-12 text-green-600" />
             </div>
             <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-              Registrazione completata!
+              Benvenuto nella tua libreria!
             </h2>
             <p className="mt-2 text-sm text-gray-600">
               Il tuo account è stato creato con successo. Verrai reindirizzato alla dashboard...
@@ -166,7 +135,7 @@ function Register({ setIsAuthenticated, setUser, setProfile }) {
             Crea il tuo account
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Inizia a catalogare la tua libreria personale
+            Inizia subito a catalogare la tua libreria personale
           </p>
         </div>
 
@@ -292,10 +261,10 @@ function Register({ setIsAuthenticated, setUser, setProfile }) {
               {loading ? (
                 <div className="flex items-center">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Registrazione in corso...
+                  Creazione account...
                 </div>
               ) : (
-                'Crea Account'
+                'Crea Account e Inizia'
               )}
             </button>
           </div>
