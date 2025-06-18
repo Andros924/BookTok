@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, BookOpen, Plus, ArrowLeft, Loader, AlertCircle } from 'lucide-react';
+import { Search, BookOpen, Plus, ArrowLeft, Loader, AlertCircle, Upload, X, Image } from 'lucide-react';
 import bookService from '../services/bookService';
 
 function AddBook() {
@@ -11,6 +11,9 @@ function AddBook() {
   const [loading, setLoading] = useState(false);
   const [manualEntry, setManualEntry] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const [imagePreview, setImagePreview] = useState('');
+  const [imageUploadMode, setImageUploadMode] = useState('url'); // 'url' o 'upload'
+  const [uploadingImage, setUploadingImage] = useState(false);
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -81,6 +84,12 @@ function AddBook() {
       purchase_date: '',
       is_favorite: false
     });
+    
+    // Imposta l'anteprima dell'immagine se disponibile
+    if (book.cover_image) {
+      setImagePreview(book.cover_image);
+      setImageUploadMode('url');
+    }
   };
 
   const handleInputChange = (e) => {
@@ -89,6 +98,77 @@ function AddBook() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+
+    // Aggiorna anteprima se cambia l'URL della copertina
+    if (name === 'cover_image' && imageUploadMode === 'url') {
+      setImagePreview(value);
+    }
+  };
+
+  // Gestione caricamento file immagine
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validazione file
+    if (!file.type.startsWith('image/')) {
+      alert('Seleziona un file immagine valido');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB max
+      alert('L\'immagine deve essere inferiore a 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+
+    try {
+      // Converti in base64
+      const base64 = await convertToBase64(file);
+      
+      // Aggiorna form data e anteprima
+      setFormData(prev => ({
+        ...prev,
+        cover_image: base64
+      }));
+      setImagePreview(base64);
+      setImageUploadMode('upload');
+      
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert('Errore nel caricamento dell\'immagine');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Funzione per convertire file in base64
+  const convertToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  // Rimuovi immagine
+  const removeImage = () => {
+    setFormData(prev => ({
+      ...prev,
+      cover_image: ''
+    }));
+    setImagePreview('');
+    setImageUploadMode('url');
+  };
+
+  // Cambia modalità di inserimento immagine
+  const switchImageMode = (mode) => {
+    setImageUploadMode(mode);
+    if (mode === 'url') {
+      setImagePreview(formData.cover_image || '');
+    }
   };
 
   const validateForm = () => {
@@ -189,6 +269,8 @@ function AddBook() {
     setSearchResults([]);
     setSearchError('');
     setSearchQuery('');
+    setImagePreview('');
+    setImageUploadMode('url');
   };
 
   return (
@@ -515,17 +597,119 @@ function AddBook() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  URL Immagine di Copertina
+              {/* Sezione Immagine di Copertina - NUOVA */}
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Immagine di Copertina
                 </label>
-                <input
-                  type="url"
-                  name="cover_image"
-                  value={formData.cover_image}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
-                />
+                
+                {/* Toggle modalità inserimento */}
+                <div className="flex gap-2 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => switchImageMode('url')}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      imageUploadMode === 'url'
+                        ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
+                        : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Image className="h-4 w-4" />
+                    URL Immagine
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => switchImageMode('upload')}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      imageUploadMode === 'upload'
+                        ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
+                        : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Upload className="h-4 w-4" />
+                    Carica File
+                  </button>
+                </div>
+
+                {/* Input URL */}
+                {imageUploadMode === 'url' && (
+                  <div className="space-y-3">
+                    <input
+                      type="url"
+                      name="cover_image"
+                      value={formData.cover_image}
+                      onChange={handleInputChange}
+                      placeholder="https://esempio.com/copertina.jpg"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Inserisci l'URL di un'immagine online
+                    </p>
+                  </div>
+                )}
+
+                {/* Upload File */}
+                {imageUploadMode === 'upload' && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-center w-full">
+                      <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          {uploadingImage ? (
+                            <Loader className="h-8 w-8 text-gray-400 animate-spin mb-2" />
+                          ) : (
+                            <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                          )}
+                          <p className="mb-2 text-sm text-gray-500">
+                            <span className="font-semibold">Clicca per caricare</span> o trascina qui
+                          </p>
+                          <p className="text-xs text-gray-500">PNG, JPG, JPEG (MAX. 5MB)</p>
+                        </div>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          disabled={uploadingImage}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* Anteprima Immagine */}
+                {imagePreview && (
+                  <div className="mt-4">
+                    <div className="relative inline-block">
+                      <img
+                        src={imagePreview}
+                        alt="Anteprima copertina"
+                        className="w-24 h-32 sm:w-32 sm:h-40 object-cover rounded-lg border border-gray-200 shadow-sm"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }}
+                      />
+                      <div 
+                        className="w-24 h-32 sm:w-32 sm:h-40 bg-gray-200 rounded-lg border border-gray-200 flex items-center justify-center"
+                        style={{display: 'none'}}
+                      >
+                        <span className="text-xs text-gray-500 text-center px-2">Immagine non valida</span>
+                      </div>
+                      
+                      {/* Pulsante rimozione */}
+                      <button
+                        type="button"
+                        onClick={removeImage}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      {imageUploadMode === 'upload' ? 'Immagine caricata' : 'Anteprima da URL'}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div>
