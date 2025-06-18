@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard'
 import Header from './components/Header'
 import BookList from './components/BookList'
 import AddBook from './components/AddBook'
+import EditBook from './components/EditBook'
 import BookDetail from './components/BookDetail'
 import Profile from './components/Profile'
 import LoanList from './components/LoanList'
@@ -177,6 +178,9 @@ function App() {
             } />
             <Route path="/books/:id" element={
               isAuthenticated ? <BookDetail /> : <Navigate to="/login" replace />
+            } />
+            <Route path="/books/:id/edit" element={
+              isAuthenticated ? <EditBook /> : <Navigate to="/login" replace />
             } />
             <Route path="/add-book" element={
               isAuthenticated ? <AddBook /> : <Navigate to="/login" replace />
