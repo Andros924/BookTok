@@ -440,7 +440,7 @@ const bookService = {
     }
   },
 
-  // Ricerca libri per ISBN - NUOVA IMPLEMENTAZIONE CON GOOGLE BOOKS
+  // Ricerca libri per ISBN - IMPLEMENTAZIONE GOOGLE BOOKS API REALE
   searchByISBN: async (isbn) => {
     try {
       console.log('🔍 Searching by ISBN:', isbn)
@@ -456,16 +456,14 @@ const bookService = {
         throw new Error('ISBN deve essere di 10 o 13 cifre')
       }
 
-      // Usa Google Books API per ISBN
-      console.log('📖 Searching Google Books by ISBN...')
-      const result = await bookService.searchGoogleBooksByISBN(cleanISBN)
+      // Usa Google Books API REALE
+      const result = await bookService.searchGoogleBooks(`isbn:${cleanISBN}`)
       
-      if (result) {
-        console.log('✅ Found book via Google Books')
-        return result
+      if (result && result.length > 0) {
+        console.log('✅ Found book via Google Books API')
+        return result[0] // Ritorna il primo risultato per ISBN
       }
 
-      // Se non trovato
       throw new Error('Libro non trovato per questo ISBN')
 
     } catch (error) {
@@ -476,7 +474,7 @@ const bookService = {
     }
   },
 
-  // Ricerca libri per titolo - NUOVA IMPLEMENTAZIONE CON GOOGLE BOOKS
+  // Ricerca libri per titolo - IMPLEMENTAZIONE GOOGLE BOOKS API REALE
   searchByTitle: async (title, maxResults = 10) => {
     try {
       console.log('🔍 Searching by title:', title)
@@ -487,12 +485,11 @@ const bookService = {
 
       const cleanTitle = title.trim()
       
-      // Usa Google Books API per titolo
-      console.log('📖 Searching Google Books by title...')
-      const results = await bookService.searchGoogleBooksByTitle(cleanTitle, maxResults)
+      // Usa Google Books API REALE
+      const results = await bookService.searchGoogleBooks(cleanTitle, maxResults)
       
       if (results && results.length > 0) {
-        console.log(`✅ Found ${results.length} books via Google Books`)
+        console.log(`✅ Found ${results.length} books via Google Books API`)
         return results
       }
 
@@ -506,27 +503,18 @@ const bookService = {
     }
   },
 
-  // Google Books API per ISBN - NUOVA IMPLEMENTAZIONE
-  searchGoogleBooksByISBN: async (isbn) => {
+  // IMPLEMENTAZIONE REALE GOOGLE BOOKS API - Come nel tuo esempio
+  searchGoogleBooks: async (query, maxResults = 10) => {
     try {
-      const searchQuery = `isbn:${isbn}`
-      const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}`
+      // Determina se è una ricerca per ISBN
+      const isISBN = /^\d{10}(\d{3})?$/.test(query.trim()) || query.startsWith('isbn:')
+      const searchQuery = isISBN && !query.startsWith('isbn:') ? `isbn:${query}` : query
+
+      const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&maxResults=${maxResults}`
       
-      console.log('🌐 Google Books ISBN URL:', url)
+      console.log('🌐 Google Books API URL:', url)
       
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000)
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'LibreriaApp/1.0'
-        },
-        signal: controller.signal
-      })
-      
-      clearTimeout(timeoutId)
+      const response = await fetch(url)
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -534,197 +522,60 @@ const bookService = {
       
       const data = await response.json()
       
-      if (!data.items || data.items.length === 0) {
-        throw new Error('Libro non trovato per questo ISBN')
+      if (!data.items || data.totalItems === 0) {
+        return []
       }
-      
-      return bookService.formatBookFromGoogleBooks(data.items[0])
+
+      // Formatta i risultati usando la stessa logica del tuo esempio
+      return data.items.map(item => {
+        const volume = item.volumeInfo
+        
+        return {
+          title: volume.title || '',
+          author: volume.authors?.join(', ') || '',
+          year: volume.publishedDate ? new Date(volume.publishedDate).getFullYear() : null,
+          description: volume.description || '',
+          cover_image: volume.imageLinks?.thumbnail || '',
+          pages: volume.pageCount || null,
+          publisher: volume.publisher || '',
+          isbn: bookService.extractISBN(volume.industryIdentifiers, 'ISBN_10'),
+          isbn13: bookService.extractISBN(volume.industryIdentifiers, 'ISBN_13'),
+          language: bookService.mapGoogleLanguage(volume.language),
+          genre: volume.categories?.join(', ') || ''
+        }
+      }).filter(book => book.title && book.author) // Filtra libri con dati essenziali
 
     } catch (error) {
-      if (error.name === 'AbortError') {
-        throw new Error('Timeout della ricerca')
-      }
+      console.error('❌ Google Books API error:', error)
       throw error
     }
   },
 
-  // Google Books API per titolo - NUOVA IMPLEMENTAZIONE
-  searchGoogleBooksByTitle: async (title, maxResults = 10) => {
-    try {
-      const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(title)}&maxResults=${maxResults}`
-      
-      console.log('🌐 Google Books Search URL:', url)
-      
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000)
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'LibreriaApp/1.0'
-        },
-        signal: controller.signal
-      })
-      
-      clearTimeout(timeoutId)
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-      
-      const data = await response.json()
-      
-      if (!data.items || data.items.length === 0) {
-        throw new Error('Nessun risultato trovato')
-      }
-
-      return data.items.map(item => bookService.formatBookFromGoogleBooks(item))
-        .filter(book => book.title && book.author) // Filtra libri con dati essenziali
-
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        throw new Error('Timeout della ricerca')
-      }
-      throw error
-    }
-  },
-
-  // Formatta libro da Google Books API - NUOVA IMPLEMENTAZIONE
-  formatBookFromGoogleBooks: (item) => {
-    try {
-      const volumeInfo = item.volumeInfo || {}
-      
-      // Estrai anno dalla data di pubblicazione
-      let year = null
-      if (volumeInfo.publishedDate) {
-        const yearMatch = volumeInfo.publishedDate.match(/(\d{4})/)
-        if (yearMatch) {
-          year = parseInt(yearMatch[1])
-        }
-      }
-
-      // Gestisci autori
-      let authors = ''
-      if (volumeInfo.authors && Array.isArray(volumeInfo.authors)) {
-        authors = volumeInfo.authors.join(', ')
-      }
-
-      // Gestisci copertina - usa la versione più grande disponibile
-      let coverImage = ''
-      if (volumeInfo.imageLinks) {
-        // Priorità: extraLarge > large > medium > small > thumbnail
-        coverImage = volumeInfo.imageLinks.extraLarge ||
-                    volumeInfo.imageLinks.large ||
-                    volumeInfo.imageLinks.medium ||
-                    volumeInfo.imageLinks.small ||
-                    volumeInfo.imageLinks.thumbnail ||
-                    ''
-        
-        // Converti HTTP in HTTPS per sicurezza
-        if (coverImage && coverImage.startsWith('http://')) {
-          coverImage = coverImage.replace('http://', 'https://')
-        }
-      }
-
-      // Gestisci ISBN
-      let isbn = ''
-      let isbn13 = ''
-      if (volumeInfo.industryIdentifiers && Array.isArray(volumeInfo.industryIdentifiers)) {
-        const isbn13Found = volumeInfo.industryIdentifiers.find(id => id.type === 'ISBN_13')
-        const isbn10Found = volumeInfo.industryIdentifiers.find(id => id.type === 'ISBN_10')
-        
-        isbn13 = isbn13Found?.identifier || ''
-        isbn = isbn13 || isbn10Found?.identifier || ''
-      }
-
-      // Gestisci generi/categorie
-      let genre = ''
-      if (volumeInfo.categories && Array.isArray(volumeInfo.categories)) {
-        genre = volumeInfo.categories.slice(0, 3).join(', ')
-      }
-
-      // Gestisci descrizione
-      let description = ''
-      if (volumeInfo.description) {
-        // Rimuovi HTML e limita lunghezza
-        description = volumeInfo.description
-          .replace(/<[^>]*>/g, '') // Rimuovi tag HTML
-          .replace(/&[^;]+;/g, ' ') // Rimuovi entità HTML
-          .trim()
-          .substring(0, 1000)
-      }
-
-      // Gestisci lingua
-      let language = bookService.mapGoogleBooksLanguage(volumeInfo.language)
-
-      return {
-        title: volumeInfo.title || '',
-        author: authors,
-        isbn: isbn,
-        isbn13: isbn13,
-        year: year,
-        description: description,
-        cover_image: coverImage,
-        pages: volumeInfo.pageCount || null,
-        language: language,
-        publisher: volumeInfo.publisher || '',
-        genre: genre
-      }
-    } catch (error) {
-      console.error('Error formatting book from Google Books:', error)
-      return {
-        title: item.volumeInfo?.title || '',
-        author: '',
-        isbn: '',
-        year: null,
-        description: '',
-        cover_image: '',
-        pages: null,
-        language: 'Italiano',
-        publisher: '',
-        genre: ''
-      }
-    }
-  },
-
-  // Mappa codici lingua di Google Books
-  mapGoogleBooksLanguage: (languageCode) => {
-    if (!languageCode) return 'Italiano'
+  // Estrai ISBN dai dati Google Books
+  extractISBN: (identifiers, type) => {
+    if (!identifiers || !Array.isArray(identifiers)) return ''
     
-    const code = languageCode.toLowerCase()
+    const identifier = identifiers.find(id => id.type === type)
+    return identifier?.identifier || ''
+  },
+
+  // Mappa lingua Google Books
+  mapGoogleLanguage: (languageCode) => {
+    if (!languageCode) return 'Italiano'
     
     const languageMap = {
       'it': 'Italiano',
-      'en': 'Inglese',
+      'en': 'Inglese', 
       'fr': 'Francese',
       'es': 'Spagnolo',
       'de': 'Tedesco',
       'pt': 'Portoghese',
       'ru': 'Russo',
       'ja': 'Giapponese',
-      'zh': 'Cinese',
-      'ar': 'Arabo',
-      'nl': 'Olandese',
-      'sv': 'Svedese',
-      'no': 'Norvegese',
-      'da': 'Danese',
-      'fi': 'Finlandese',
-      'pl': 'Polacco',
-      'cs': 'Ceco',
-      'hu': 'Ungherese',
-      'ro': 'Rumeno',
-      'bg': 'Bulgaro',
-      'hr': 'Croato',
-      'sk': 'Slovacco',
-      'sl': 'Sloveno',
-      'et': 'Estone',
-      'lv': 'Lettone',
-      'lt': 'Lituano',
-      'mt': 'Maltese'
+      'zh': 'Cinese'
     }
     
-    return languageMap[code] || 'Altro'
+    return languageMap[languageCode.toLowerCase()] || 'Altro'
   },
 
   // Aggiungi ai preferiti - VERSIONE CORRETTA
