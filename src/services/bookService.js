@@ -440,7 +440,7 @@ const bookService = {
     }
   },
 
-  // Ricerca libri per ISBN - NUOVA IMPLEMENTAZIONE CON OPEN LIBRARY
+  // Ricerca libri per ISBN - NUOVA IMPLEMENTAZIONE CON GOOGLE BOOKS
   searchByISBN: async (isbn) => {
     try {
       console.log('🔍 Searching by ISBN:', isbn)
@@ -456,12 +456,12 @@ const bookService = {
         throw new Error('ISBN deve essere di 10 o 13 cifre')
       }
 
-      // Usa Open Library API per ISBN
-      console.log('📖 Searching Open Library by ISBN...')
-      const result = await bookService.searchOpenLibraryByISBN(cleanISBN)
+      // Usa Google Books API per ISBN
+      console.log('📖 Searching Google Books by ISBN...')
+      const result = await bookService.searchGoogleBooksByISBN(cleanISBN)
       
       if (result) {
-        console.log('✅ Found book via Open Library')
+        console.log('✅ Found book via Google Books')
         return result
       }
 
@@ -476,7 +476,7 @@ const bookService = {
     }
   },
 
-  // Ricerca libri per titolo - NUOVA IMPLEMENTAZIONE CON OPEN LIBRARY
+  // Ricerca libri per titolo - NUOVA IMPLEMENTAZIONE CON GOOGLE BOOKS
   searchByTitle: async (title, maxResults = 10) => {
     try {
       console.log('🔍 Searching by title:', title)
@@ -487,12 +487,12 @@ const bookService = {
 
       const cleanTitle = title.trim()
       
-      // Usa Open Library API per titolo
-      console.log('📖 Searching Open Library by title...')
-      const results = await bookService.searchOpenLibraryByTitle(cleanTitle, maxResults)
+      // Usa Google Books API per titolo
+      console.log('📖 Searching Google Books by title...')
+      const results = await bookService.searchGoogleBooksByTitle(cleanTitle, maxResults)
       
       if (results && results.length > 0) {
-        console.log(`✅ Found ${results.length} books via Open Library`)
+        console.log(`✅ Found ${results.length} books via Google Books`)
         return results
       }
 
@@ -506,12 +506,13 @@ const bookService = {
     }
   },
 
-  // Open Library API per ISBN - NUOVA IMPLEMENTAZIONE
-  searchOpenLibraryByISBN: async (isbn) => {
+  // Google Books API per ISBN - NUOVA IMPLEMENTAZIONE
+  searchGoogleBooksByISBN: async (isbn) => {
     try {
-      const url = `https://openlibrary.org/isbn/${isbn}.json`
+      const searchQuery = `isbn:${isbn}`
+      const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}`
       
-      console.log('🌐 Open Library ISBN URL:', url)
+      console.log('🌐 Google Books ISBN URL:', url)
       
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 10000)
@@ -528,19 +529,16 @@ const bookService = {
       clearTimeout(timeoutId)
       
       if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('Libro non trovato per questo ISBN')
-        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
       
       const data = await response.json()
       
-      if (!data) {
-        throw new Error('Nessun dato ricevuto')
+      if (!data.items || data.items.length === 0) {
+        throw new Error('Libro non trovato per questo ISBN')
       }
       
-      return bookService.formatBookFromOpenLibraryISBN(data, isbn)
+      return bookService.formatBookFromGoogleBooks(data.items[0])
 
     } catch (error) {
       if (error.name === 'AbortError') {
@@ -550,13 +548,12 @@ const bookService = {
     }
   },
 
-  // Open Library API per titolo - NUOVA IMPLEMENTAZIONE
-  searchOpenLibraryByTitle: async (title, maxResults = 10) => {
+  // Google Books API per titolo - NUOVA IMPLEMENTAZIONE
+  searchGoogleBooksByTitle: async (title, maxResults = 10) => {
     try {
-      const encodedTitle = encodeURIComponent(title)
-      const url = `https://openlibrary.org/search.json?q=${encodedTitle}&limit=${maxResults}`
+      const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(title)}&maxResults=${maxResults}`
       
-      console.log('🌐 Open Library Search URL:', url)
+      console.log('🌐 Google Books Search URL:', url)
       
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 10000)
@@ -578,11 +575,11 @@ const bookService = {
       
       const data = await response.json()
       
-      if (!data.docs || data.docs.length === 0) {
+      if (!data.items || data.items.length === 0) {
         throw new Error('Nessun risultato trovato')
       }
 
-      return data.docs.map(book => bookService.formatBookFromOpenLibrarySearch(book))
+      return data.items.map(item => bookService.formatBookFromGoogleBooks(item))
         .filter(book => book.title && book.author) // Filtra libri con dati essenziali
 
     } catch (error) {
@@ -593,13 +590,15 @@ const bookService = {
     }
   },
 
-  // Formatta libro da Open Library ISBN API - NUOVA IMPLEMENTAZIONE
-  formatBookFromOpenLibraryISBN: (data, isbn) => {
+  // Formatta libro da Google Books API - NUOVA IMPLEMENTAZIONE
+  formatBookFromGoogleBooks: (item) => {
     try {
+      const volumeInfo = item.volumeInfo || {}
+      
       // Estrai anno dalla data di pubblicazione
       let year = null
-      if (data.publish_date) {
-        const yearMatch = data.publish_date.match(/(\d{4})/)
+      if (volumeInfo.publishedDate) {
+        const yearMatch = volumeInfo.publishedDate.match(/(\d{4})/)
         if (yearMatch) {
           year = parseInt(yearMatch[1])
         }
@@ -607,136 +606,75 @@ const bookService = {
 
       // Gestisci autori
       let authors = ''
-      if (data.authors && Array.isArray(data.authors)) {
-        // Gli autori sono riferimenti, prendiamo solo i nomi se disponibili
-        authors = data.authors.map(author => {
-          if (typeof author === 'string') return author
-          if (author.name) return author.name
-          if (author.key) return author.key.split('/').pop().replace(/_/g, ' ')
-          return 'Autore sconosciuto'
-        }).join(', ')
+      if (volumeInfo.authors && Array.isArray(volumeInfo.authors)) {
+        authors = volumeInfo.authors.join(', ')
       }
 
-      // Gestisci copertina
+      // Gestisci copertina - usa la versione più grande disponibile
       let coverImage = ''
-      if (data.covers && data.covers.length > 0) {
-        // Usa il primo cover ID per costruire l'URL
-        const coverId = data.covers[0]
-        coverImage = `https://covers.openlibrary.org/b/id/${coverId}-L.jpg`
-      }
-
-      // Gestisci generi/soggetti
-      let genre = ''
-      if (data.subjects && Array.isArray(data.subjects)) {
-        genre = data.subjects.slice(0, 3).join(', ')
-      }
-
-      // Gestisci descrizione
-      let description = ''
-      if (data.description) {
-        if (typeof data.description === 'string') {
-          description = data.description
-        } else if (data.description.value) {
-          description = data.description.value
+      if (volumeInfo.imageLinks) {
+        // Priorità: extraLarge > large > medium > small > thumbnail
+        coverImage = volumeInfo.imageLinks.extraLarge ||
+                    volumeInfo.imageLinks.large ||
+                    volumeInfo.imageLinks.medium ||
+                    volumeInfo.imageLinks.small ||
+                    volumeInfo.imageLinks.thumbnail ||
+                    ''
+        
+        // Converti HTTP in HTTPS per sicurezza
+        if (coverImage && coverImage.startsWith('http://')) {
+          coverImage = coverImage.replace('http://', 'https://')
         }
-        // Rimuovi HTML e limita lunghezza
-        description = description.replace(/<[^>]*>/g, '').substring(0, 1000)
-      }
-
-      return {
-        title: data.title || '',
-        author: authors,
-        isbn: isbn || '',
-        isbn13: isbn && isbn.length === 13 ? isbn : '',
-        year: year,
-        description: description,
-        cover_image: coverImage,
-        pages: data.number_of_pages || null,
-        language: bookService.mapLanguage(data.languages?.[0]?.key),
-        publisher: Array.isArray(data.publishers) ? data.publishers[0] : (data.publishers || ''),
-        genre: genre
-      }
-    } catch (error) {
-      console.error('Error formatting book from Open Library ISBN:', error)
-      return {
-        title: data.title || '',
-        author: '',
-        isbn: isbn || '',
-        year: null,
-        description: '',
-        cover_image: '',
-        pages: null,
-        language: 'Italiano',
-        publisher: '',
-        genre: ''
-      }
-    }
-  },
-
-  // Formatta libro da Open Library Search API - NUOVA IMPLEMENTAZIONE
-  formatBookFromOpenLibrarySearch: (book) => {
-    try {
-      // Estrai anno dalla prima data di pubblicazione
-      let year = null
-      if (book.first_publish_year) {
-        year = parseInt(book.first_publish_year)
-      } else if (book.publish_year && book.publish_year.length > 0) {
-        year = parseInt(book.publish_year[0])
-      }
-
-      // Gestisci autori
-      let authors = ''
-      if (book.author_name && Array.isArray(book.author_name)) {
-        authors = book.author_name.slice(0, 3).join(', ')
-      }
-
-      // Gestisci copertina
-      let coverImage = ''
-      if (book.cover_i) {
-        coverImage = `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg`
       }
 
       // Gestisci ISBN
       let isbn = ''
       let isbn13 = ''
-      if (book.isbn && Array.isArray(book.isbn)) {
-        // Cerca prima ISBN-13, poi ISBN-10
-        const isbn13Found = book.isbn.find(i => i.length === 13)
-        const isbn10Found = book.isbn.find(i => i.length === 10)
+      if (volumeInfo.industryIdentifiers && Array.isArray(volumeInfo.industryIdentifiers)) {
+        const isbn13Found = volumeInfo.industryIdentifiers.find(id => id.type === 'ISBN_13')
+        const isbn10Found = volumeInfo.industryIdentifiers.find(id => id.type === 'ISBN_10')
         
-        isbn13 = isbn13Found || ''
-        isbn = isbn13Found || isbn10Found || ''
+        isbn13 = isbn13Found?.identifier || ''
+        isbn = isbn13 || isbn10Found?.identifier || ''
       }
 
-      // Gestisci generi/soggetti
+      // Gestisci generi/categorie
       let genre = ''
-      if (book.subject && Array.isArray(book.subject)) {
-        genre = book.subject.slice(0, 3).join(', ')
+      if (volumeInfo.categories && Array.isArray(volumeInfo.categories)) {
+        genre = volumeInfo.categories.slice(0, 3).join(', ')
+      }
+
+      // Gestisci descrizione
+      let description = ''
+      if (volumeInfo.description) {
+        // Rimuovi HTML e limita lunghezza
+        description = volumeInfo.description
+          .replace(/<[^>]*>/g, '') // Rimuovi tag HTML
+          .replace(/&[^;]+;/g, ' ') // Rimuovi entità HTML
+          .trim()
+          .substring(0, 1000)
       }
 
       // Gestisci lingua
-      let language = 'Italiano'
-      if (book.language && Array.isArray(book.language)) {
-        language = bookService.mapLanguage(book.language[0])
-      }
+      let language = bookService.mapGoogleBooksLanguage(volumeInfo.language)
 
       return {
-        title: book.title || '',
+        title: volumeInfo.title || '',
         author: authors,
         isbn: isbn,
         isbn13: isbn13,
         year: year,
-        description: '', // La search API non fornisce descrizioni dettagliate
+        description: description,
         cover_image: coverImage,
-        pages: book.number_of_pages_median || null,
+        pages: volumeInfo.pageCount || null,
         language: language,
-        publisher: Array.isArray(book.publisher) ? book.publisher[0] : (book.publisher || ''),
+        publisher: volumeInfo.publisher || '',
         genre: genre
       }
     } catch (error) {
-      console.error('Error formatting book from Open Library search:', error)
+      console.error('Error formatting book from Google Books:', error)
       return {
-        title: book.title || '',
+        title: item.volumeInfo?.title || '',
         author: '',
         isbn: '',
         year: null,
@@ -750,34 +688,40 @@ const bookService = {
     }
   },
 
-  // Mappa codici lingua di Open Library
-  mapLanguage: (languageCode) => {
+  // Mappa codici lingua di Google Books
+  mapGoogleBooksLanguage: (languageCode) => {
     if (!languageCode) return 'Italiano'
     
-    // Rimuovi il prefixo "/languages/" se presente
-    const code = languageCode.replace('/languages/', '').toLowerCase()
+    const code = languageCode.toLowerCase()
     
     const languageMap = {
-      'ita': 'Italiano',
       'it': 'Italiano',
-      'eng': 'Inglese',
       'en': 'Inglese',
-      'fre': 'Francese',
       'fr': 'Francese',
-      'fra': 'Francese',
-      'spa': 'Spagnolo',
       'es': 'Spagnolo',
-      'ger': 'Tedesco',
       'de': 'Tedesco',
-      'deu': 'Tedesco',
-      'por': 'Portoghese',
       'pt': 'Portoghese',
-      'rus': 'Russo',
       'ru': 'Russo',
-      'jpn': 'Giapponese',
       'ja': 'Giapponese',
-      'chi': 'Cinese',
-      'zh': 'Cinese'
+      'zh': 'Cinese',
+      'ar': 'Arabo',
+      'nl': 'Olandese',
+      'sv': 'Svedese',
+      'no': 'Norvegese',
+      'da': 'Danese',
+      'fi': 'Finlandese',
+      'pl': 'Polacco',
+      'cs': 'Ceco',
+      'hu': 'Ungherese',
+      'ro': 'Rumeno',
+      'bg': 'Bulgaro',
+      'hr': 'Croato',
+      'sk': 'Slovacco',
+      'sl': 'Sloveno',
+      'et': 'Estone',
+      'lv': 'Lettone',
+      'lt': 'Lituano',
+      'mt': 'Maltese'
     }
     
     return languageMap[code] || 'Altro'
