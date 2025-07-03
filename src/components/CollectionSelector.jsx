@@ -9,7 +9,7 @@ function CollectionSelector() {
         {/* Header */}
         <div className="text-center mb-12 sm:mb-16">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-            Le Tue Collezioni
+            Le tue collezioni
           </h1>
           <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto">
             Scegli quale collezione vuoi gestire oggi. Organizza i tuoi libri e film preferiti in un unico posto.

@@ -64,7 +64,7 @@ function Dashboard() {
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
         {/* Header */}
         <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">La Tua Libreria</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">La tua libreria</h1>
           <p className="mt-2 text-sm sm:text-base text-gray-600">Gestisci e organizza la tua collezione di libri</p>
         </div>
 
