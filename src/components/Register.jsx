@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BookOpen, User, Mail, Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { BookOpen, Film, User, Mail, Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import authService from '../services/authService';
 
 function Register({ setIsAuthenticated, setUser, setProfile }) {
@@ -109,10 +109,10 @@ function Register({ setIsAuthenticated, setUser, setProfile }) {
               <CheckCircle className="h-12 w-12 text-green-600" />
             </div>
             <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-              Benvenuto nella tua libreria!
+              Benvenuto in MediaVault!
             </h2>
             <p className="mt-2 text-sm text-gray-600">
-              Il tuo account è stato creato con successo. Verrai reindirizzato alla dashboard...
+              Il tuo account è stato creato con successo. Verrai reindirizzato alle tue collezioni...
             </p>
             <div className="mt-4">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600 mx-auto"></div>
@@ -125,17 +125,20 @@ function Register({ setIsAuthenticated, setUser, setProfile }) {
 
   // Form di registrazione
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="flex justify-center">
-            <BookOpen className="h-10 w-10 sm:h-12 sm:w-12 text-indigo-600" />
+          <div className="flex justify-center items-center space-x-2 mb-6">
+            <div className="flex items-center space-x-1">
+              <BookOpen className="h-8 w-8 sm:h-10 sm:w-10 text-emerald-600" />
+              <Film className="h-8 w-8 sm:h-10 sm:w-10 text-purple-600" />
+            </div>
           </div>
-          <h2 className="mt-6 text-2xl sm:text-3xl font-extrabold text-gray-900">
-            Crea il tuo account
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-2">
+            Unisciti a MediaVault
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Inizia subito a catalogare la tua libreria personale
+          <p className="text-sm text-gray-600">
+            Crea il tuo account e inizia a organizzare le tue collezioni
           </p>
         </div>
 
