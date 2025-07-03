@@ -11,10 +11,14 @@ import BookList from './components/BookList'
 import AddBook from './components/AddBook'
 import EditBook from './components/EditBook'
 import BookDetail from './components/BookDetail'
+import MovieList from './components/MovieList'
 import AddMovie from './components/AddMovie'
+import MovieDetail from './components/MovieDetail'
 import Profile from './components/Profile'
 import LoanList from './components/LoanList'
 import NewLoan from './components/NewLoan'
+import MovieLoanList from './components/MovieLoanList'
+import NewMovieLoan from './components/NewMovieLoan'
 import authService from './services/authService'
 
 function App() {
@@ -206,8 +210,20 @@ function App() {
             <Route path="/movies-dashboard" element={
               isAuthenticated ? <MoviesDashboard /> : <Navigate to="/login" replace />
             } />
+            <Route path="/movies" element={
+              isAuthenticated ? <MovieList /> : <Navigate to="/login" replace />
+            } />
+            <Route path="/movies/:id" element={
+              isAuthenticated ? <MovieDetail /> : <Navigate to="/login" replace />
+            } />
             <Route path="/add-movie" element={
               isAuthenticated ? <AddMovie /> : <Navigate to="/login" replace />
+            } />
+            <Route path="/movie-loans" element={
+              isAuthenticated ? <MovieLoanList /> : <Navigate to="/login" replace />
+            } />
+            <Route path="/movie-loans/new" element={
+              isAuthenticated ? <NewMovieLoan /> : <Navigate to="/login" replace />
             } />
             
             {/* Profile */}
