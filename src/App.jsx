@@ -11,6 +11,7 @@ import BookList from './components/BookList'
 import AddBook from './components/AddBook'
 import EditBook from './components/EditBook'
 import BookDetail from './components/BookDetail'
+import AddMovie from './components/AddMovie'
 import Profile from './components/Profile'
 import LoanList from './components/LoanList'
 import NewLoan from './components/NewLoan'
@@ -204,6 +205,9 @@ function App() {
             {/* Movies Routes */}
             <Route path="/movies-dashboard" element={
               isAuthenticated ? <MoviesDashboard /> : <Navigate to="/login" replace />
+            } />
+            <Route path="/add-movie" element={
+              isAuthenticated ? <AddMovie /> : <Navigate to="/login" replace />
             } />
             
             {/* Profile */}
