@@ -3,7 +3,9 @@ import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast'
 import Login from './components/Login'
 import Register from './components/Register'
+import CollectionSelector from './components/CollectionSelector'
 import Dashboard from './components/Dashboard'
+import MoviesDashboard from './components/MoviesDashboard'
 import Header from './components/Header'
 import BookList from './components/BookList'
 import AddBook from './components/AddBook'
@@ -170,7 +172,14 @@ function App() {
               isAuthenticated ? <Navigate to="/dashboard" replace /> : 
               <Register setIsAuthenticated={setIsAuthenticated} setUser={setUser} setProfile={setProfile} />
             } />
+            
+            {/* Collection Selector - Main Dashboard */}
             <Route path="/dashboard" element={
+              isAuthenticated ? <CollectionSelector /> : <Navigate to="/login" replace />
+            } />
+            
+            {/* Books Routes */}
+            <Route path="/books-dashboard" element={
               isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />
             } />
             <Route path="/books" element={
@@ -191,9 +200,17 @@ function App() {
             <Route path="/loans/new" element={
               isAuthenticated ? <NewLoan /> : <Navigate to="/login" replace />
             } />
+            
+            {/* Movies Routes */}
+            <Route path="/movies-dashboard" element={
+              isAuthenticated ? <MoviesDashboard /> : <Navigate to="/login" replace />
+            } />
+            
+            {/* Profile */}
             <Route path="/profile" element={
               isAuthenticated ? <Profile user={profile} setUser={setProfile} /> : <Navigate to="/login" replace />
             } />
+            
             <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
           </Routes>
         </main>

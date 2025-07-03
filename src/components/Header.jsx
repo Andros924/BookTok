@@ -1,17 +1,33 @@
 import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { BookOpen, Menu, X, User, LogOut, Home, Plus, Library, Users } from 'lucide-react'
+import { BookOpen, Film, Menu, X, User, LogOut, Home, Plus, Library, Users } from 'lucide-react'
 
 function Header({ user, onLogout }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const location = useLocation()
 
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: Home },
+  // Determina se siamo nella sezione libri o film
+  const isInBooksSection = location.pathname.includes('/books') || location.pathname.includes('/add-book') || location.pathname.includes('/loans')
+  const isInMoviesSection = location.pathname.includes('/movies') || location.pathname.includes('/add-movie') || location.pathname.includes('/movie-loans')
+
+  const booksNavigation = [
+    { name: 'Dashboard', href: '/books-dashboard', icon: Home },
     { name: 'Libreria', href: '/books', icon: Library },
     { name: 'Aggiungi', href: '/add-book', icon: Plus },
     { name: 'Prestiti', href: '/loans', icon: Users },
   ]
+
+  const moviesNavigation = [
+    { name: 'Dashboard', href: '/movies-dashboard', icon: Home },
+    { name: 'Filmoteca', href: '/movies', icon: Film },
+    { name: 'Aggiungi', href: '/add-movie', icon: Plus },
+    { name: 'Prestiti', href: '/movie-loans', icon: Users },
+  ]
+
+  // Usa la navigazione appropriata o quella di default
+  const navigation = isInBooksSection ? booksNavigation : 
+                    isInMoviesSection ? moviesNavigation : 
+                    [{ name: 'Collezioni', href: '/dashboard', icon: Home }]
 
   const isActive = (path) => location.pathname === path
 
@@ -22,9 +38,18 @@ function Header({ user, onLogout }) {
           {/* Logo */}
           <div className="flex items-center">
             <Link to="/dashboard" className="flex items-center">
-              <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-indigo-600" />
+              {isInBooksSection ? (
+                <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-emerald-600" />
+              ) : isInMoviesSection ? (
+                <Film className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
+              ) : (
+                <div className="flex items-center space-x-1">
+                  <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
+                  <Film className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
+                </div>
+              )}
               <span className="ml-2 text-lg sm:text-xl font-bold text-gray-900 hidden xs:block">
-                Libreria
+                {isInBooksSection ? 'Libreria' : isInMoviesSection ? 'Filmoteca' : 'Collezioni'}
               </span>
             </Link>
           </div>
@@ -39,7 +64,11 @@ function Header({ user, onLogout }) {
                   to={item.href}
                   className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors duration-200 ${
                     isActive(item.href)
-                      ? 'border-indigo-500 text-gray-900'
+                      ? isInBooksSection 
+                        ? 'border-emerald-500 text-gray-900'
+                        : isInMoviesSection
+                        ? 'border-purple-500 text-gray-900'
+                        : 'border-indigo-500 text-gray-900'
                       : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
                   }`}
                 >
@@ -56,7 +85,11 @@ function Header({ user, onLogout }) {
               to="/profile"
               className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
                 isActive('/profile')
-                  ? 'bg-indigo-100 text-indigo-700'
+                  ? isInBooksSection
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : isInMoviesSection
+                    ? 'bg-purple-100 text-purple-700'
+                    : 'bg-indigo-100 text-indigo-700'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
               }`}
             >
@@ -104,7 +137,11 @@ function Header({ user, onLogout }) {
                   onClick={() => setIsMenuOpen(false)}
                   className={`flex items-center px-3 py-3 rounded-md text-base font-medium transition-colors duration-200 ${
                     isActive(item.href)
-                      ? 'bg-indigo-50 border-indigo-500 text-indigo-700'
+                      ? isInBooksSection
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
+                        : isInMoviesSection
+                        ? 'bg-purple-50 border-purple-500 text-purple-700'
+                        : 'bg-indigo-50 border-indigo-500 text-indigo-700'
                       : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'
                   }`}
                 >
