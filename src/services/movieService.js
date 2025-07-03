@@ -33,10 +33,16 @@ const movieService = {
         query = query.eq('format', filters.format)
       }
 
-      // Ordinamento
+      // Ordinamento - CORRETTO per gestire l'ordinamento alfabetico
       const sortBy = filters.sortBy || 'created_at'
       const sortOrder = filters.sortOrder || 'desc'
-      query = query.order(sortBy, { ascending: sortOrder === 'asc' })
+      
+      // Per l'ordinamento alfabetico, forziamo sempre 'asc'
+      if (sortBy === 'title' || sortBy === 'director') {
+        query = query.order(sortBy, { ascending: true })
+      } else {
+        query = query.order(sortBy, { ascending: sortOrder === 'asc' })
+      }
 
       const { data, error } = await query
 

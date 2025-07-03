@@ -46,13 +46,23 @@ function MovieList() {
       filtered = filtered.filter(movie => movie.watch_status === statusFilter);
     }
 
-    // Sort movies
+    // Sort movies - CORRETTO per gestire l'ordinamento alfabetico
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'title':
-          return a.title.localeCompare(b.title);
+          // Ordinamento alfabetico per titolo (sempre crescente)
+          return a.title.localeCompare(b.title, 'it', { 
+            sensitivity: 'base',
+            numeric: true,
+            ignorePunctuation: true 
+          });
         case 'director':
-          return a.director.localeCompare(b.director);
+          // Ordinamento alfabetico per regista (sempre crescente)
+          return a.director.localeCompare(b.director, 'it', { 
+            sensitivity: 'base',
+            numeric: true,
+            ignorePunctuation: true 
+          });
         case 'year':
           return (b.year || 0) - (a.year || 0);
         case 'rating':
@@ -294,8 +304,8 @@ function MovieList() {
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 text-sm sm:text-base"
               >
                 <option value="created_at">Data aggiunta</option>
-                <option value="title">Titolo</option>
-                <option value="director">Regista</option>
+                <option value="title">Titolo (A-Z)</option>
+                <option value="director">Regista (A-Z)</option>
                 <option value="year">Anno</option>
                 <option value="rating">Valutazione</option>
               </select>
