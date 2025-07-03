@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BookOpen, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { BookOpen, Film, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import authService from '../services/authService';
 
 function Login({ setIsAuthenticated, setUser }) {
@@ -36,17 +36,20 @@ function Login({ setIsAuthenticated, setUser }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="flex justify-center">
-            <BookOpen className="h-10 w-10 sm:h-12 sm:w-12 text-indigo-600" />
+          <div className="flex justify-center items-center space-x-2 mb-6">
+            <div className="flex items-center space-x-1">
+              <BookOpen className="h-8 w-8 sm:h-10 sm:w-10 text-emerald-600" />
+              <Film className="h-8 w-8 sm:h-10 sm:w-10 text-purple-600" />
+            </div>
           </div>
-          <h2 className="mt-6 text-2xl sm:text-3xl font-extrabold text-gray-900">
-            Accedi alla tua libreria
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-2">
+            Benvenuto in MediaVault
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Gestisci la tua collezione di libri
+          <p className="text-sm text-gray-600">
+            Accedi al tuo archivio personale di libri e film
           </p>
         </div>
 
@@ -120,7 +123,7 @@ function Login({ setIsAuthenticated, setUser }) {
                   Accesso...
                 </div>
               ) : (
-                'Accedi'
+                'Accedi a MediaVault'
               )}
             </button>
           </div>
